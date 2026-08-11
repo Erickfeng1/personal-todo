@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { taskService } from '../../app/services'
 import { CloseIcon } from '../../components/icons'
 import { getTodayLocal, type LocalDate } from '../../domain/date/local-date'
 import { AppError } from '../../domain/shared/app-error'
+import { useProjects, useTags } from '../../hooks/useOrganization'
 import type {
   Task,
   TaskImportance,
@@ -13,21 +14,36 @@ import type {
 interface TaskDetailsPanelProps {
   task: Task | null
   onClose: () => void
+  onDelete: (task: Task) => Promise<void>
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
-export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
+export function TaskDetailsPanel({
+  task,
+  onClose,
+  onDelete
+}: TaskDetailsPanelProps) {
+  const projects = useProjects(true)
+  const tags = useTags()
+  const titleInputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState<UpdateTaskDetailsInput>(() => ({
     title: task?.title ?? '',
     notes: task?.notes ?? '',
     importance: task?.importance ?? null,
     urgency: task?.urgency ?? null,
     plannedDate: task?.plannedDate ?? null,
-    deadline: task?.deadline ?? null
+    deadline: task?.deadline ?? null,
+    inbox: task?.inbox ?? false,
+    projectId: task?.projectId ?? null,
+    tagIds: task?.tagIds ?? []
   }))
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (task) titleInputRef.current?.focus()
+  }, [task])
 
   if (!task) return null
 
@@ -37,7 +53,10 @@ export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
     draft.importance !== task.importance ||
     draft.urgency !== task.urgency ||
     draft.plannedDate !== task.plannedDate ||
-    draft.deadline !== task.deadline
+    draft.deadline !== task.deadline ||
+    draft.inbox !== task.inbox ||
+    draft.projectId !== task.projectId ||
+    draft.tagIds.join(',') !== task.tagIds.join(',')
   const dateOrderWarning =
     draft.plannedDate !== null &&
     draft.deadline !== null &&
@@ -75,7 +94,8 @@ export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
   const updateDate = (field: 'plannedDate' | 'deadline', value: string) => {
     setDraft((current) => ({
       ...current,
-      [field]: value.length === 0 ? null : (value as LocalDate)
+      [field]: value.length === 0 ? null : (value as LocalDate),
+      inbox: field === 'plannedDate' && value.length > 0 ? false : current.inbox
     }))
     setSaveState('idle')
     setError(null)
@@ -102,6 +122,7 @@ export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
         <div className="detail-field">
           <label htmlFor="task-title">标题</label>
           <input
+            ref={titleInputRef}
             id="task-title"
             value={draft.title}
             maxLength={300}
@@ -231,6 +252,86 @@ export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
           </div>
         </fieldset>
 
+        <div className="detail-field">
+          <label htmlFor="task-project">项目</label>
+          <select
+            id="task-project"
+            value={draft.projectId ?? ''}
+            onChange={(event) => {
+              const projectId = event.target.value || null
+              setDraft((current) => ({
+                ...current,
+                projectId,
+                inbox: projectId === null ? current.inbox : false
+              }))
+              setSaveState('idle')
+              setError(null)
+            }}
+          >
+            <option value="">无项目</option>
+            {projects?.map((project) => (
+              <option
+                key={project.id}
+                value={project.id}
+                disabled={
+                  project.archivedAt !== null && project.id !== draft.projectId
+                }
+              >
+                {project.name}
+                {project.archivedAt ? '（已归档）' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <fieldset className="tag-picker">
+          <legend>标签</legend>
+          {tags && tags.length > 0 ? (
+            <div>
+              {tags.map((tag) => (
+                <label key={tag.id}>
+                  <input
+                    type="checkbox"
+                    checked={draft.tagIds.includes(tag.id)}
+                    onChange={(event) => {
+                      setDraft((current) => ({
+                        ...current,
+                        tagIds: event.target.checked
+                          ? [...current.tagIds, tag.id]
+                          : current.tagIds.filter((id) => id !== tag.id)
+                      }))
+                      setSaveState('idle')
+                      setError(null)
+                    }}
+                  />
+                  <span># {tag.name}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p>还没有标签，可在“标签”页面创建。</p>
+          )}
+        </fieldset>
+
+        <label className="inbox-toggle">
+          <input
+            type="checkbox"
+            checked={draft.inbox}
+            onChange={(event) => {
+              setDraft((current) => ({
+                ...current,
+                inbox: event.target.checked
+              }))
+              setSaveState('idle')
+              setError(null)
+            }}
+          />
+          <span>
+            <strong>保留在收集箱</strong>
+            <small>即使已有日期或项目，也可以手动移回 Inbox。</small>
+          </span>
+        </label>
+
         {error ? (
           <div className="inline-error detail-error" role="alert">
             {error}
@@ -274,6 +375,13 @@ export function TaskDetailsPanel({ task, onClose }: TaskDetailsPanelProps) {
           <dd>此浏览器 IndexedDB</dd>
         </div>
       </dl>
+      <button
+        type="button"
+        className="delete-task-button"
+        onClick={() => void onDelete(task)}
+      >
+        删除任务
+      </button>
     </aside>
   )
 }

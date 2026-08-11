@@ -1,5 +1,8 @@
 import type { Task } from '../../domain/task/task.types'
 import { TaskItem } from './TaskItem'
+import type { Project } from '../../domain/project/project.types'
+import type { Tag } from '../../domain/tag/tag.types'
+import { useMemo } from 'react'
 
 interface TaskListProps {
   tasks: Task[]
@@ -7,6 +10,8 @@ interface TaskListProps {
   selectedTaskId: string | null
   onSelect: (task: Task) => void
   onToggle: (task: Task) => Promise<void>
+  projects: Project[]
+  tags: Tag[]
   emptyTitle: string
   emptyDescription: string
 }
@@ -25,9 +30,20 @@ export function TaskList({
   selectedTaskId,
   onSelect,
   onToggle,
+  projects,
+  tags,
   emptyTitle,
   emptyDescription
 }: TaskListProps) {
+  const projectMap = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects]
+  )
+  const tagMap = useMemo(
+    () => new Map(tags.map((tag) => [tag.id, tag])),
+    [tags]
+  )
+
   if (tasks.length === 0) {
     return (
       <div className="empty-state">
@@ -49,6 +65,11 @@ export function TaskList({
           selected={selectedTaskId === task.id}
           onSelect={onSelect}
           onToggle={onToggle}
+          project={projectMap.get(task.projectId ?? '') ?? null}
+          taskTags={task.tagIds.flatMap((tagId) => {
+            const tag = tagMap.get(tagId)
+            return tag ? [tag] : []
+          })}
         />
       ))}
     </ul>

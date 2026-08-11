@@ -1,20 +1,24 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { taskService } from '../app/services'
 import {
   getTodayGroup,
   getUpcomingDate,
-  matchesClassificationFilter,
+  filterAndSortTasks,
   TODAY_GROUP_ORDER
 } from '../domain/task/task.rules'
-import { formatLocalDate, getTodayLocal } from '../domain/date/local-date'
-import type {
-  ClassificationFilter,
-  CreateTaskContext,
-  Task
-} from '../domain/task/task.types'
+import {
+  formatLocalDate,
+  getTodayLocal,
+  type LocalDate
+} from '../domain/date/local-date'
+import type { CreateTaskContext, Task } from '../domain/task/task.types'
 import { QuickAdd } from '../features/task-create/QuickAdd'
 import { TaskDetailsPanel } from '../features/task-detail/TaskDetailsPanel'
 import { TaskFilters } from '../features/search-filter/TaskFilters'
+import {
+  DEFAULT_TASK_FILTERS,
+  type TaskFilterState
+} from '../features/search-filter/task-filter.types'
 import { TaskList } from '../features/task-list/TaskList'
 import type { TaskSection } from '../features/task-list/TaskList'
 import {
@@ -22,9 +26,11 @@ import {
   type TaskCollection
 } from '../hooks/useTaskCollection'
 import { useTaskKeyboard } from '../hooks/useTaskKeyboard'
+import { useProjects, useTags } from '../hooks/useOrganization'
 
 interface TaskViewPageProps {
   collection: TaskCollection
+  entityId?: string
   eyebrow: string
   title: string
   description: string
@@ -39,6 +45,7 @@ interface TaskViewPageProps {
 interface Feedback {
   message: string
   undoTaskId?: string
+  undoAction?: 'reopen' | 'restore-delete'
 }
 
 const TODAY_SECTION_DETAILS = {
@@ -66,6 +73,7 @@ const TODAY_SECTION_DETAILS = {
 
 export function TaskViewPage({
   collection,
+  entityId,
   eyebrow,
   title,
   description,
@@ -73,32 +81,44 @@ export function TaskViewPage({
   emptyDescription,
   quickAdd
 }: TaskViewPageProps) {
-  const tasks = useTaskCollection(collection)
   const [search, setSearch] = useState('')
-  const [classification, setClassification] =
-    useState<ClassificationFilter>('all')
+  const deferredSearch = useDeferredValue(search)
+  const [filters, setFilters] = useState<TaskFilterState>(DEFAULT_TASK_FILTERS)
+  const includeCompletedSearch =
+    filters.includeCompleted && deferredSearch.trim().length > 0
+  const tasks = useTaskCollection(collection, entityId)
+  const allTasks = useTaskCollection(
+    'all',
+    undefined,
+    true,
+    includeCompletedSearch
+  )
+  const projects = useProjects(true)
+  const tags = useTags()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const detailTriggerRef = useRef<HTMLElement | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [operationError, setOperationError] = useState<string | null>(null)
 
-  const closeDetails = useCallback(() => setSelectedTaskId(null), [])
+  const closeDetails = useCallback(() => {
+    setSelectedTaskId(null)
+    window.setTimeout(() => detailTriggerRef.current?.focus(), 0)
+  }, [])
   useTaskKeyboard({ onEscape: closeDetails, canCreate: quickAdd !== undefined })
 
   const filteredTasks = useMemo(() => {
-    if (!tasks) return []
-    const normalizedSearch = search.trim().toLocaleLowerCase()
-    return tasks.filter((task) => {
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        task.title.toLocaleLowerCase().includes(normalizedSearch) ||
-        task.notes.toLocaleLowerCase().includes(normalizedSearch)
-      return matchesSearch && matchesClassificationFilter(task, classification)
+    const sourceTasks = includeCompletedSearch ? allTasks : tasks
+    if (!sourceTasks) return []
+
+    return filterAndSortTasks(sourceTasks, {
+      ...filters,
+      search: deferredSearch
     })
-  }, [classification, search, tasks])
+  }, [allTasks, deferredSearch, filters, includeCompletedSearch, tasks])
 
   const sections = useMemo<TaskSection[] | undefined>(() => {
     const today = getTodayLocal()
-    if (collection === 'today') {
+    if (collection === 'today' && !includeCompletedSearch) {
       return TODAY_GROUP_ORDER.flatMap((group) => {
         const groupTasks = filteredTasks.filter(
           (task) => getTodayGroup(task, today) === group
@@ -117,8 +137,8 @@ export function TaskViewPage({
       })
     }
 
-    if (collection === 'upcoming') {
-      const grouped = new Map<string, Task[]>()
+    if (collection === 'upcoming' && !includeCompletedSearch) {
+      const grouped = new Map<LocalDate, Task[]>()
       for (const task of filteredTasks) {
         const date = getUpcomingDate(task, today, 7)
         if (!date) continue
@@ -137,7 +157,7 @@ export function TaskViewPage({
           ).length
           return {
             id: date,
-            title: formatLocalDate(date as `${number}-${number}-${number}`),
+            title: formatLocalDate(date),
             description: `${date} · 计划 ${String(plannedCount)} · 截止 ${String(deadlineCount)}`,
             tone: 'upcoming' as const,
             tasks: dateTasks
@@ -145,10 +165,29 @@ export function TaskViewPage({
         })
     }
 
-    return undefined
-  }, [collection, filteredTasks])
+    if (collection === 'completed') {
+      const grouped = new Map<LocalDate, Task[]>()
+      for (const task of filteredTasks) {
+        if (!task.completedAt) continue
+        const date = getTodayLocal(new Date(task.completedAt))
+        grouped.set(date, [...(grouped.get(date) ?? []), task])
+      }
+      return [...grouped.entries()]
+        .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+        .map(([date, dateTasks]) => ({
+          id: date,
+          title: formatLocalDate(date),
+          description: `${date} · 完成 ${String(dateTasks.length)}`,
+          tone: 'planned' as const,
+          tasks: dateTasks
+        }))
+    }
 
-  const selectedTask = tasks?.find((task) => task.id === selectedTaskId) ?? null
+    return undefined
+  }, [collection, filteredTasks, includeCompletedSearch])
+
+  const selectedTask =
+    filteredTasks.find((task) => task.id === selectedTaskId) ?? null
 
   const handleToggle = async (task: Task) => {
     setOperationError(null)
@@ -158,7 +197,11 @@ export function TaskViewPage({
         setFeedback({ message: `“${task.title}”已恢复` })
       } else {
         await taskService.complete(task.id)
-        setFeedback({ message: `“${task.title}”已完成`, undoTaskId: task.id })
+        setFeedback({
+          message: `“${task.title}”已完成`,
+          undoTaskId: task.id,
+          undoAction: 'reopen'
+        })
       }
       if (selectedTaskId === task.id) setSelectedTaskId(null)
     } catch {
@@ -169,10 +212,30 @@ export function TaskViewPage({
   const handleUndo = async () => {
     if (!feedback?.undoTaskId) return
     try {
-      await taskService.reopen(feedback.undoTaskId)
-      setFeedback({ message: '已撤销完成' })
+      if (feedback.undoAction === 'restore-delete') {
+        await taskService.restoreDeleted(feedback.undoTaskId)
+        setFeedback({ message: '已撤销删除' })
+      } else {
+        await taskService.reopen(feedback.undoTaskId)
+        setFeedback({ message: '已撤销完成' })
+      }
     } catch {
-      setOperationError('撤销失败，请前往“已完成”恢复任务。')
+      setOperationError('撤销失败，任务状态没有改变，请重试。')
+    }
+  }
+
+  const handleDelete = async (task: Task) => {
+    setOperationError(null)
+    try {
+      await taskService.softDelete(task.id)
+      setSelectedTaskId(null)
+      setFeedback({
+        message: `“${task.title}”已删除`,
+        undoTaskId: task.id,
+        undoAction: 'restore-delete'
+      })
+    } catch {
+      setOperationError('删除失败，任务仍然保留，请重试。')
     }
   }
 
@@ -204,8 +267,10 @@ export function TaskViewPage({
         <TaskFilters
           search={search}
           onSearchChange={setSearch}
-          classification={classification}
-          onClassificationChange={setClassification}
+          filters={filters}
+          onFiltersChange={setFilters}
+          projects={projects ?? []}
+          tags={tags ?? []}
         />
 
         {operationError ? (
@@ -225,8 +290,16 @@ export function TaskViewPage({
             tasks={filteredTasks}
             {...(sections ? { sections } : {})}
             selectedTaskId={selectedTaskId}
-            onSelect={(task) => setSelectedTaskId(task.id)}
+            onSelect={(task) => {
+              detailTriggerRef.current =
+                document.activeElement instanceof HTMLElement
+                  ? document.activeElement
+                  : null
+              setSelectedTaskId(task.id)
+            }}
             onToggle={handleToggle}
+            projects={projects ?? []}
+            tags={tags ?? []}
             emptyTitle={
               tasks.length > 0 && filteredTasks.length === 0
                 ? '没有符合条件的任务'
@@ -245,6 +318,7 @@ export function TaskViewPage({
         key={selectedTask?.id ?? 'no-selection'}
         task={selectedTask}
         onClose={closeDetails}
+        onDelete={handleDelete}
       />
 
       {feedback ? (

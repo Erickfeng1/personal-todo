@@ -7,5 +7,8 @@ export interface TaskRepository {
   queryInbox(): Promise<Task[]>
   queryToday(today: LocalDate): Promise<Task[]>
   queryUpcoming(today: LocalDate, days: number): Promise<Task[]>
+  queryByProject(projectId: string): Promise<Task[]>
+  queryByTag(tagId: string): Promise<Task[]>
+  queryAll(includeCompleted?: boolean): Promise<Task[]>
   queryCompleted(): Promise<Task[]>
 }

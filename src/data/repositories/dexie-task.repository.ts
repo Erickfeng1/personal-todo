@@ -50,6 +50,37 @@ export class DexieTaskRepository implements TaskRepository {
       .sort(newestFirst)
   }
 
+  async queryByProject(projectId: string): Promise<Task[]> {
+    const tasks = await this.database.tasks
+      .where('projectId')
+      .equals(projectId)
+      .toArray()
+    return tasks
+      .filter((task) => task.status === 'todo' && task.deletedAt === null)
+      .sort(newestFirst)
+  }
+
+  async queryByTag(tagId: string): Promise<Task[]> {
+    const tasks = await this.database.tasks
+      .where('tagIds')
+      .equals(tagId)
+      .toArray()
+    return tasks
+      .filter((task) => task.status === 'todo' && task.deletedAt === null)
+      .sort(newestFirst)
+  }
+
+  async queryAll(includeCompleted = false): Promise<Task[]> {
+    const tasks = await this.database.tasks.toArray()
+    return tasks
+      .filter(
+        (task) =>
+          task.deletedAt === null &&
+          (includeCompleted || task.status === 'todo')
+      )
+      .sort(newestFirst)
+  }
+
   async queryCompleted(): Promise<Task[]> {
     const tasks = await this.database.tasks
       .where('status')

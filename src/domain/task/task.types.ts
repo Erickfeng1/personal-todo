@@ -41,10 +41,16 @@ export interface UpdateTaskDetailsInput {
   urgency: TaskUrgency | null
   plannedDate: LocalDate | null
   deadline: LocalDate | null
+  inbox: boolean
+  projectId: UUID | null
+  tagIds: UUID[]
 }
 
 export type CreateTaskContext =
-  { source: 'inbox' } | { source: 'today'; today: LocalDate }
+  | { source: 'inbox' }
+  | { source: 'today'; today: LocalDate }
+  | { source: 'project'; projectId: UUID }
+  | { source: 'tag'; tagId: UUID }
 
 export interface TaskClassificationPatch {
   importance: TaskImportance | null
@@ -56,3 +62,20 @@ export type ClassificationFilter =
 
 export type TodayGroup =
   'overdue-deadline' | 'due-today' | 'carry-over' | 'planned-today'
+
+export type TaskSort = 'created' | 'planned' | 'deadline' | 'quadrant'
+
+export interface TaskFilterOptions {
+  status: TaskStatus | 'all'
+  importance: TaskImportance | 'all'
+  urgency: TaskUrgency | 'all'
+  quadrant: EisenhowerQuadrant | 'unclassified' | 'all'
+  projectId: string
+  tagId: string
+  sort: TaskSort
+  includeCompleted: boolean
+}
+
+export interface TaskFilterQuery extends TaskFilterOptions {
+  search: string
+}

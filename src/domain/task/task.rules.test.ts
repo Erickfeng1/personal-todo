@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   completeTask,
   createTask,
+  filterAndSortTasks,
   getEisenhowerQuadrant,
   getTodayGroup,
   getUpcomingDate,
   matchesClassificationFilter,
   normalizeTaskTitle,
   reopenTask,
+  restoreDeletedTask,
+  softDeleteTask,
   updateTaskClassification,
   updateTaskDetails
 } from './task.rules'
@@ -46,6 +49,22 @@ describe('task rules', () => {
 
     expect(task.inbox).toBe(false)
     expect(task.plannedDate).toBe('2026-08-11')
+  })
+
+  it('creates project and tag tasks with the documented Inbox semantics', () => {
+    const projectTask = createTask(
+      { title: '项目任务' },
+      { source: 'project', projectId: 'project-1' },
+      options
+    )
+    const tagTask = createTask(
+      { title: '标签任务' },
+      { source: 'tag', tagId: 'tag-1' },
+      options
+    )
+
+    expect(projectTask).toMatchObject({ projectId: 'project-1', inbox: false })
+    expect(tagTask).toMatchObject({ tagIds: ['tag-1'], inbox: true })
   })
 
   it('completes and reopens without losing classification', () => {
@@ -101,7 +120,10 @@ describe('task rules', () => {
         importance: 'important',
         urgency: 'not-urgent',
         plannedDate: null,
-        deadline: '2026-08-15'
+        deadline: '2026-08-15',
+        inbox: false,
+        projectId: null,
+        tagIds: []
       },
       '2026-08-11T09:00:00.000Z'
     )
@@ -127,7 +149,10 @@ describe('task rules', () => {
         importance: task.importance,
         urgency: task.urgency,
         plannedDate: '2026-08-12',
-        deadline: null
+        deadline: null,
+        inbox: false,
+        projectId: null,
+        tagIds: []
       },
       '2026-08-11T09:00:00.000Z'
     )
@@ -181,5 +206,83 @@ describe('task rules', () => {
         '2026-08-11'
       )
     ).toBe('2026-08-12')
+  })
+
+  it('soft deletes and restores without changing completion or organization', () => {
+    const task = {
+      ...createTask({ title: '临时任务' }, { source: 'inbox' }, options),
+      projectId: 'project-1',
+      tagIds: ['tag-1']
+    }
+    const deleted = softDeleteTask(task, '2026-08-11T10:00:00.000Z')
+    const restored = restoreDeletedTask(deleted, '2026-08-11T11:00:00.000Z')
+
+    expect(deleted.deletedAt).toBe('2026-08-11T10:00:00.000Z')
+    expect(restored).toMatchObject({
+      deletedAt: null,
+      projectId: 'project-1',
+      tagIds: ['tag-1'],
+      status: 'todo'
+    })
+  })
+
+  it('combines importance, urgency, project, and tag filters with AND semantics', () => {
+    const matching = {
+      ...createTask({ title: '匹配合同' }, { source: 'inbox' }, options),
+      importance: 'important' as const,
+      urgency: 'not-urgent' as const,
+      projectId: 'project-1',
+      tagIds: ['tag-1']
+    }
+    const wrongUrgency = {
+      ...matching,
+      id: 'task-2',
+      urgency: 'urgent' as const
+    }
+
+    const results = filterAndSortTasks([matching, wrongUrgency], {
+      search: '合同',
+      status: 'all',
+      importance: 'important',
+      urgency: 'not-urgent',
+      quadrant: 'all',
+      projectId: 'project-1',
+      tagId: 'tag-1',
+      sort: 'created',
+      includeCompleted: false
+    })
+
+    expect(results.map((task) => task.id)).toEqual(['task-1'])
+  })
+
+  it('sorts complete quadrants before unclassified tasks', () => {
+    const unclassified = createTask(
+      { title: '未分类' },
+      { source: 'inbox' },
+      { ...options, id: 'unclassified' }
+    )
+    const importantUrgent = {
+      ...unclassified,
+      id: 'important-urgent',
+      importance: 'important' as const,
+      urgency: 'urgent' as const
+    }
+
+    const results = filterAndSortTasks([unclassified, importantUrgent], {
+      search: '',
+      status: 'all',
+      importance: 'all',
+      urgency: 'all',
+      quadrant: 'all',
+      projectId: 'all',
+      tagId: 'all',
+      sort: 'quadrant',
+      includeCompleted: false
+    })
+
+    expect(results.map((task) => task.id)).toEqual([
+      'important-urgent',
+      'unclassified'
+    ])
   })
 })

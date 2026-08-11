@@ -8,6 +8,7 @@ import type {
   EisenhowerQuadrant,
   Task,
   TaskClassificationPatch,
+  TaskFilterQuery,
   TodayGroup,
   UpdateTaskDetailsInput
 } from './task.types'
@@ -37,6 +38,10 @@ export function createTask(
   context: CreateTaskContext,
   options: { id: string; now: string; sortOrder: number }
 ): Task {
+  const fromToday = context.source === 'today'
+  const fromProject = context.source === 'project'
+  const fromTag = context.source === 'tag'
+
   return {
     id: options.id,
     title: normalizeTaskTitle(input.title),
@@ -44,11 +49,11 @@ export function createTask(
     status: 'todo',
     importance: null,
     urgency: null,
-    plannedDate: context.source === 'today' ? context.today : null,
+    plannedDate: fromToday ? context.today : null,
     deadline: null,
-    inbox: context.source === 'inbox',
-    projectId: null,
-    tagIds: [],
+    inbox: context.source === 'inbox' || fromTag,
+    projectId: fromProject ? context.projectId : null,
+    tagIds: fromTag ? [context.tagId] : [],
     sortOrder: options.sortOrder,
     createdAt: options.now,
     updatedAt: options.now,
@@ -130,9 +135,21 @@ export function updateTaskDetails(
     urgency: input.urgency,
     plannedDate,
     deadline,
-    inbox: plannedDate === null ? task.inbox : false,
+    inbox: input.inbox,
+    projectId: input.projectId,
+    tagIds: [...new Set(input.tagIds)],
     updatedAt: now
   }
+}
+
+export function softDeleteTask(task: Task, now: string): Task {
+  if (task.deletedAt !== null) return task
+  return { ...task, deletedAt: now, updatedAt: now }
+}
+
+export function restoreDeletedTask(task: Task, now: string): Task {
+  if (task.deletedAt === null) return task
+  return { ...task, deletedAt: null, updatedAt: now }
 }
 
 export const TODAY_GROUP_ORDER: TodayGroup[] = [
@@ -194,4 +211,72 @@ export function matchesClassificationFilter(
     return task.urgency === filter
   }
   return getEisenhowerQuadrant(task) === filter
+}
+
+export function filterAndSortTasks(
+  tasks: Task[],
+  query: TaskFilterQuery
+): Task[] {
+  const normalizedSearch = query.search.trim().toLocaleLowerCase()
+  const matches = tasks.filter((task) => {
+    const matchesSearch =
+      normalizedSearch.length === 0 ||
+      task.title.toLocaleLowerCase().includes(normalizedSearch) ||
+      task.notes.toLocaleLowerCase().includes(normalizedSearch)
+    if (!matchesSearch) return false
+    if (query.status !== 'all' && task.status !== query.status) return false
+    if (query.importance !== 'all' && task.importance !== query.importance) {
+      return false
+    }
+    if (query.urgency !== 'all' && task.urgency !== query.urgency) return false
+
+    const quadrant = getEisenhowerQuadrant(task)
+    if (
+      query.quadrant === 'unclassified' &&
+      task.importance !== null &&
+      task.urgency !== null
+    ) {
+      return false
+    }
+    if (
+      query.quadrant !== 'all' &&
+      query.quadrant !== 'unclassified' &&
+      quadrant !== query.quadrant
+    ) {
+      return false
+    }
+    if (query.projectId !== 'all' && task.projectId !== query.projectId) {
+      return false
+    }
+    if (query.tagId !== 'all' && !task.tagIds.includes(query.tagId)) {
+      return false
+    }
+    return true
+  })
+
+  const quadrantOrder = new Map([
+    ['important-urgent', 0],
+    ['important-not-urgent', 1],
+    ['not-important-urgent', 2],
+    ['not-important-not-urgent', 3]
+  ])
+  return [...matches].sort((a, b) => {
+    if (query.sort === 'planned') {
+      return (a.plannedDate ?? '9999-12-31').localeCompare(
+        b.plannedDate ?? '9999-12-31'
+      )
+    }
+    if (query.sort === 'deadline') {
+      return (a.deadline ?? '9999-12-31').localeCompare(
+        b.deadline ?? '9999-12-31'
+      )
+    }
+    if (query.sort === 'quadrant') {
+      return (
+        (quadrantOrder.get(getEisenhowerQuadrant(a) ?? '') ?? 4) -
+        (quadrantOrder.get(getEisenhowerQuadrant(b) ?? '') ?? 4)
+      )
+    }
+    return b.createdAt.localeCompare(a.createdAt)
+  })
 }
