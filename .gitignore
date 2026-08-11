@@ -8,6 +8,7 @@ dist/
 coverage/
 
 # Test artifacts
+.playwright-cli/
 playwright-report/
 test-results/
 
@@ -15,6 +16,7 @@ test-results/
 .env
 .env.*
 !.env.example
+.vercel/
 
 # Logs
 *.log
