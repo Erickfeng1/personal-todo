@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { CompletedIcon, InboxIcon, TodayIcon } from '../icons'
+import { CompletedIcon, InboxIcon, TodayIcon, UpcomingIcon } from '../icons'
 
 const navItems = [
   { to: '/today', label: '今天', icon: TodayIcon },
   { to: '/inbox', label: '收集箱', icon: InboxIcon },
+  { to: '/upcoming', label: '未来', icon: UpcomingIcon },
   { to: '/completed', label: '已完成', icon: CompletedIcon }
 ]
 

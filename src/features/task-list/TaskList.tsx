@@ -3,6 +3,7 @@ import { TaskItem } from './TaskItem'
 
 interface TaskListProps {
   tasks: Task[]
+  sections?: TaskSection[]
   selectedTaskId: string | null
   onSelect: (task: Task) => void
   onToggle: (task: Task) => Promise<void>
@@ -10,8 +11,17 @@ interface TaskListProps {
   emptyDescription: string
 }
 
+export interface TaskSection {
+  id: string
+  title: string
+  description?: string
+  tone?: 'overdue' | 'due' | 'carry' | 'planned' | 'upcoming'
+  tasks: Task[]
+}
+
 export function TaskList({
   tasks,
+  sections,
   selectedTaskId,
   onSelect,
   onToggle,
@@ -30,9 +40,9 @@ export function TaskList({
     )
   }
 
-  return (
+  const renderTasks = (sectionTasks: Task[]) => (
     <ul className="task-list">
-      {tasks.map((task) => (
+      {sectionTasks.map((task) => (
         <TaskItem
           key={task.id}
           task={task}
@@ -43,4 +53,28 @@ export function TaskList({
       ))}
     </ul>
   )
+
+  if (sections) {
+    return (
+      <div className="task-sections">
+        {sections.map((section) => (
+          <section
+            key={section.id}
+            className={`task-section task-section-${section.tone ?? 'upcoming'}`}
+          >
+            <header className="task-section-header">
+              <div>
+                <h2>{section.title}</h2>
+                {section.description ? <p>{section.description}</p> : null}
+              </div>
+              <span>{section.tasks.length}</span>
+            </header>
+            {renderTasks(section.tasks)}
+          </section>
+        ))}
+      </div>
+    )
+  }
+
+  return renderTasks(tasks)
 }

@@ -29,6 +29,16 @@ export function TodayIcon(props: IconProps) {
   )
 }
 
+export function UpcomingIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M7 3v3M17 3v3M4 9h16" />
+      <rect x="4" y="5" width="16" height="16" rx="3" />
+      <path d="M8 13h3M8 17h8M15 13h1" />
+    </IconBase>
+  )
+}
+
 export function InboxIcon(props: IconProps) {
   return (
     <IconBase {...props}>

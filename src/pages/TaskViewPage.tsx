@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { taskService } from '../app/services'
-import { matchesClassificationFilter } from '../domain/task/task.rules'
+import {
+  getTodayGroup,
+  getUpcomingDate,
+  matchesClassificationFilter,
+  TODAY_GROUP_ORDER
+} from '../domain/task/task.rules'
+import { formatLocalDate, getTodayLocal } from '../domain/date/local-date'
 import type {
   ClassificationFilter,
   CreateTaskContext,
@@ -10,6 +16,7 @@ import { QuickAdd } from '../features/task-create/QuickAdd'
 import { TaskDetailsPanel } from '../features/task-detail/TaskDetailsPanel'
 import { TaskFilters } from '../features/search-filter/TaskFilters'
 import { TaskList } from '../features/task-list/TaskList'
+import type { TaskSection } from '../features/task-list/TaskList'
 import {
   useTaskCollection,
   type TaskCollection
@@ -33,6 +40,29 @@ interface Feedback {
   message: string
   undoTaskId?: string
 }
+
+const TODAY_SECTION_DETAILS = {
+  'overdue-deadline': {
+    title: '逾期截止',
+    description: '已经超过截止日期，需要重新判断或尽快处理。',
+    tone: 'overdue'
+  },
+  'due-today': {
+    title: '今日截止',
+    description: '最晚需要在今天完成。',
+    tone: 'due'
+  },
+  'carry-over': {
+    title: '未完成结转',
+    description: '之前计划处理，但尚未完成。',
+    tone: 'carry'
+  },
+  'planned-today': {
+    title: '今日计划',
+    description: '你主动安排在今天处理。',
+    tone: 'planned'
+  }
+} as const
 
 export function TaskViewPage({
   collection,
@@ -65,6 +95,58 @@ export function TaskViewPage({
       return matchesSearch && matchesClassificationFilter(task, classification)
     })
   }, [classification, search, tasks])
+
+  const sections = useMemo<TaskSection[] | undefined>(() => {
+    const today = getTodayLocal()
+    if (collection === 'today') {
+      return TODAY_GROUP_ORDER.flatMap((group) => {
+        const groupTasks = filteredTasks.filter(
+          (task) => getTodayGroup(task, today) === group
+        )
+        if (groupTasks.length === 0) return []
+        const details = TODAY_SECTION_DETAILS[group]
+        return [
+          {
+            id: group,
+            title: details.title,
+            description: details.description,
+            tone: details.tone,
+            tasks: groupTasks
+          }
+        ]
+      })
+    }
+
+    if (collection === 'upcoming') {
+      const grouped = new Map<string, Task[]>()
+      for (const task of filteredTasks) {
+        const date = getUpcomingDate(task, today, 7)
+        if (!date) continue
+        const dateTasks = grouped.get(date) ?? []
+        dateTasks.push(task)
+        grouped.set(date, dateTasks)
+      }
+      return [...grouped.entries()]
+        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+        .map(([date, dateTasks]) => {
+          const plannedCount = dateTasks.filter(
+            (task) => task.plannedDate === date
+          ).length
+          const deadlineCount = dateTasks.filter(
+            (task) => task.deadline === date
+          ).length
+          return {
+            id: date,
+            title: formatLocalDate(date as `${number}-${number}-${number}`),
+            description: `${date} · 计划 ${String(plannedCount)} · 截止 ${String(deadlineCount)}`,
+            tone: 'upcoming' as const,
+            tasks: dateTasks
+          }
+        })
+    }
+
+    return undefined
+  }, [collection, filteredTasks])
 
   const selectedTask = tasks?.find((task) => task.id === selectedTaskId) ?? null
 
@@ -141,6 +223,7 @@ export function TaskViewPage({
         ) : (
           <TaskList
             tasks={filteredTasks}
+            {...(sections ? { sections } : {})}
             selectedTaskId={selectedTaskId}
             onSelect={(task) => setSelectedTaskId(task.id)}
             onToggle={handleToggle}

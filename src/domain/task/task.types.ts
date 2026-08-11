@@ -34,6 +34,15 @@ export interface CreateTaskInput {
   title: string
 }
 
+export interface UpdateTaskDetailsInput {
+  title: string
+  notes: string
+  importance: TaskImportance | null
+  urgency: TaskUrgency | null
+  plannedDate: LocalDate | null
+  deadline: LocalDate | null
+}
+
 export type CreateTaskContext =
   { source: 'inbox' } | { source: 'today'; today: LocalDate }
 
@@ -44,3 +53,6 @@ export interface TaskClassificationPatch {
 
 export type ClassificationFilter =
   'all' | TaskImportance | TaskUrgency | EisenhowerQuadrant | 'unclassified'
+
+export type TodayGroup =
+  'overdue-deadline' | 'due-today' | 'carry-over' | 'planned-today'

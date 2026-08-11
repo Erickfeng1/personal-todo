@@ -2,6 +2,7 @@ import type { TodoDatabase } from '../db'
 import type { LocalDate } from '../../domain/date/local-date'
 import type { TaskRepository } from '../../domain/task/task.repository'
 import type { Task } from '../../domain/task/task.types'
+import { getTodayGroup, getUpcomingDate } from '../../domain/task/task.rules'
 
 function newestFirst(a: Task, b: Task): number {
   return b.sortOrder - a.sortOrder
@@ -25,6 +26,7 @@ export class DexieTaskRepository implements TaskRepository {
       .toArray()
     return tasks
       .filter((task) => task.status === 'todo' && task.deletedAt === null)
+      .filter((task) => task.inbox)
       .sort(newestFirst)
   }
 
@@ -34,14 +36,17 @@ export class DexieTaskRepository implements TaskRepository {
       .equals('todo')
       .toArray()
     return tasks
-      .filter(
-        (task) =>
-          task.deletedAt === null &&
-          (task.plannedDate === today ||
-            task.deadline === today ||
-            (task.deadline !== null && task.deadline < today) ||
-            (task.plannedDate !== null && task.plannedDate < today))
-      )
+      .filter((task) => getTodayGroup(task, today) !== null)
+      .sort(newestFirst)
+  }
+
+  async queryUpcoming(today: LocalDate, days: number): Promise<Task[]> {
+    const tasks = await this.database.tasks
+      .where('status')
+      .equals('todo')
+      .toArray()
+    return tasks
+      .filter((task) => getUpcomingDate(task, today, days) !== null)
       .sort(newestFirst)
   }
 

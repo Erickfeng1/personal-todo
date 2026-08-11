@@ -3,6 +3,7 @@ import {
   completeTask,
   createTask,
   reopenTask,
+  updateTaskDetails,
   updateTaskClassification
 } from './task.rules'
 import type { TaskRepository } from './task.repository'
@@ -10,7 +11,8 @@ import type {
   CreateTaskContext,
   CreateTaskInput,
   Task,
-  TaskClassificationPatch
+  TaskClassificationPatch,
+  UpdateTaskDetailsInput
 } from './task.types'
 
 interface TaskServiceDependencies {
@@ -68,6 +70,16 @@ export class TaskService {
       patch,
       this.now().toISOString()
     )
+    await this.persist(updated)
+    return updated
+  }
+
+  async updateDetails(
+    id: string,
+    input: UpdateTaskDetailsInput
+  ): Promise<Task> {
+    const task = await this.requireTask(id)
+    const updated = updateTaskDetails(task, input, this.now().toISOString())
     await this.persist(updated)
     return updated
   }
