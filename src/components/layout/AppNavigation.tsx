@@ -8,6 +8,7 @@ import {
   TodayIcon,
   UpcomingIcon
 } from '../icons'
+import { useCloudAuth } from '../../auth/cloud-auth-context'
 
 const navItems = [
   { to: '/today', label: '今天', icon: TodayIcon },
@@ -20,6 +21,9 @@ const navItems = [
 ]
 
 export function AppNavigation() {
+  const auth = useCloudAuth()
+  const isSignedIn = auth.status === 'signed-in'
+
   return (
     <aside className="app-nav">
       <div className="brand" aria-label="序 Todo">
@@ -50,8 +54,8 @@ export function AppNavigation() {
       <div className="local-first-note">
         <span className="local-dot" aria-hidden="true" />
         <div>
-          <strong>仅保存在此设备</strong>
-          <span>无账号 · 本地优先</span>
+          <strong>{isSignedIn ? '同步尚未启用' : '仅保存在此设备'}</strong>
+          <span>{isSignedIn ? '已登录 · 本地优先' : '本地模式'}</span>
         </div>
       </div>
     </aside>

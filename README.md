@@ -35,6 +35,8 @@
 
 Phase 4 已完成 Chromium 生产 PWA 离线、360px 移动端、导出—恢复和基础无障碍验收。正式发布前仍建议在真实 Safari/Firefox 与个人手机上各抽测一次，并用真实长期数据观察性能。
 
+Phase 5A–5B 已完成可选云同步的基础设施与只读账号切片：设置页可登录/退出，服务端使用 Clerk 会话隔离 Neon 查询，并可读取云端摘要与首个增量页。登录不会自动上传本地任务，首次迁移、双向同步、冲突与删除安全仍属于 Phase 5C–5E；本地功能与 IndexedDB 数据路径保持不变。
+
 ## 本地运行
 
 要求 Node.js 22 或兼容版本。
@@ -64,10 +66,24 @@ npm run preview
 
 ## 数据与隐私
 
-- 没有账号、后端数据库或云同步。
-- 不会把任务标题、备注或分类上传到 Vercel。
+- 账号登录是可选能力；未登录时全部 MVP 功能继续使用 IndexedDB。本阶段登录后只读取云端摘要，不代表已启用同步。
+- 在后续阶段由用户明确登录、确认首次上传前，不会把任务标题、备注或分类上传到云端。
 - 不同浏览器、设备和域名拥有相互独立的数据。
 - 清除浏览器站点数据会删除本地任务；可在设置页定期导出 JSON 完整备份。
+
+## Phase 5A–5B 本地基础设施
+
+复制 `.env.example` 为不会提交的 `.env.local`，填入隔离的 Clerk 测试实例和 Neon 测试/Preview 分支变量。`DATABASE_ENVIRONMENT` 必须是 `development`、`test` 或 `preview`，数据库修改脚本才会运行。
+
+```bash
+npm run auth:check
+npm run db:migrate
+npm run db:check
+npm run test:integration
+npm run functions:check
+```
+
+Vercel Functions 提供 `GET /api/health`，以及受 Clerk 会话保护的 `GET /api/sync/state?protocolVersion=1` 和 `GET /api/sync/pull?protocolVersion=1`。`pull` 使用与服务端用户身份绑定的签名游标。首次上传、push、持续双向同步和冲突处理将在 Phase 5C～5E 按验收场景逐步实现。
 
 ## Git 与部署
 

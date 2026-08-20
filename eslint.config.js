@@ -5,7 +5,15 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'playwright-report', 'test-results'] },
+  {
+    ignores: [
+      '.agents',
+      'dist',
+      'coverage',
+      'playwright-report',
+      'test-results'
+    ]
+  },
   {
     extends: [
       js.configs.recommended,
@@ -30,6 +38,12 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true }
       ]
+    }
+  },
+  {
+    files: ['api/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts'],
+    languageOptions: {
+      globals: globals.node
     }
   },
   {

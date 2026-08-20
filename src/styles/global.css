@@ -1454,6 +1454,81 @@ input:disabled {
   font-size: 10px;
 }
 
+.account-panel,
+.sync-read-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--paper);
+}
+
+.account-panel p,
+.sync-read-error p,
+.account-status,
+.sync-disabled-note,
+.sync-summary p {
+  margin-top: 7px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.account-action {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sync-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sync-summary > div {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--sand);
+}
+
+.sync-summary span {
+  color: var(--orange);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.sync-summary strong {
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.sync-read-error {
+  border-color: #edc7ba;
+  background: #f9e8e1;
+}
+
+.sync-read-error p,
+.sync-disabled-note {
+  margin: 0;
+}
+
+.sync-disabled-note {
+  padding: 13px 15px;
+  border-left: 3px solid var(--orange);
+  background: var(--sand);
+}
+
 .backup-actions {
   display: grid;
   gap: 10px;
@@ -1780,7 +1855,9 @@ input:disabled {
   }
 
   .settings-section-header,
-  .backup-actions article {
+  .backup-actions article,
+  .account-panel,
+  .sync-read-error {
     align-items: stretch;
     flex-direction: column;
   }
@@ -1795,7 +1872,8 @@ input:disabled {
   }
 
   .backup-actions button,
-  .file-button {
+  .file-button,
+  .account-action {
     width: 100%;
   }
 

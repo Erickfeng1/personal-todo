@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
+import { CloudAuthProvider } from './auth/CloudAuthProvider'
 import './styles/global.css'
 
 const root = document.getElementById('root')
@@ -12,6 +13,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <CloudAuthProvider>
+      <RouterProvider router={router} />
+    </CloudAuthProvider>
   </StrictMode>
 )

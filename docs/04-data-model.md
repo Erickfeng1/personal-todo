@@ -1,8 +1,8 @@
 # 数据模型与业务规则
 
-> 文档状态：MVP 基线
-> Schema 版本：1
-> 存储目标：浏览器 IndexedDB
+> 文档状态：MVP 基线 + Phase 5 已批准范围
+> 本地业务 Schema 版本：1（Phase 5 实现时递增）
+> 存储目标：浏览器 IndexedDB 为本地数据源；Phase 5 增加托管 PostgreSQL
 > 原则：领域模型不依赖具体 UI；日期语义明确；所有引用可校验
 
 ## 1. 建模原则
@@ -186,7 +186,7 @@ MVP 默认值：
 }
 ```
 
-时区不持久化为任务日期的一部分。`plannedDate` 和 `deadline` 是用户输入的本地自然日；Today 和 Upcoming 使用运行时设备时区计算。未来云同步时必须重新评估跨时区语义。
+时区不持久化为任务日期的一部分。`plannedDate` 和 `deadline` 是用户输入的本地自然日；Today 和 Upcoming 使用运行时设备时区计算。Phase 5 跨设备同步日期字符串本身，不按设备时区转换；用户旅行或两台设备处于不同时区时，各设备仍按自己的本地“今天”派生视图。
 
 ## 7. 数据库元数据
 
@@ -414,5 +414,182 @@ personal-todo-backup-YYYY-MM-DD-HHmm.json
 
 - 周期任务需要 `RecurrenceRule`、系列主任务和实例策略，不能只给 Task 加一个字符串。
 - 提醒需要 `reminderAt`、权限状态、触发渠道和错过提醒策略。
-- 云同步需要 `revision`、设备标识、冲突策略和删除墓碑；不能直接同步当前 Dexie 表。
+- Phase 5 云同步使用独立同步元数据、版本检查和删除墓碑；不能直接把当前 Dexie 表暴露给云端，详见第 15～20 节。
 - 子任务需决定是独立 Task 还是 ChecklistItem。MVP 暂不预留含糊字段。
+
+## 15. Phase 5 建模边界
+
+Phase 5 不修改第 3～6 节的领域实体语义，也不把 `userId`、网络错误或队列状态塞进 `Task`、`Project`、`Tag`。同步信息属于持久化适配层，原因是：
+
+- 未登录的本地模式不需要所有者字段。
+- 业务规则测试不应依赖网络或身份提供商。
+- 同一实体在不同设备有各自的本地同步状态，但共享同一云端版本。
+- JSON 业务备份默认保持可读，不包含登录令牌、设备标识、队列和冲突内部数据。
+
+云端表使用与本地相同的客户端生成 UUID。`plannedDate`、`deadline` 仍按 `YYYY-MM-DD` 保存；事件时间仍使用 UTC。
+
+## 16. 本地同步元数据
+
+Phase 5 增加以下 IndexedDB 适配层表；具体 Dexie schema 版本由实现提交确定并配套迁移测试。
+
+```ts
+type SyncEntityType = 'task' | 'project' | 'tag' | 'settings'
+type SyncOperation = 'upsert' | 'delete'
+type SyncState =
+  | 'local-only'
+  | 'pending'
+  | 'syncing'
+  | 'synced'
+  | 'failed'
+  | 'conflict'
+
+interface SyncRecord {
+  entityType: SyncEntityType
+  entityId: UUID
+  accountSubject: string | null
+  serverRevision: number | null
+  state: SyncState
+  lastAttemptAt: UTCDateTime | null
+  lastSyncedAt: UTCDateTime | null
+  lastErrorCode: string | null
+}
+
+interface SyncOutboxItem {
+  mutationId: UUID
+  accountSubject: string
+  entityType: SyncEntityType
+  entityId: UUID
+  operation: SyncOperation
+  /** 创建操作为 null；更新/删除为客户端最后确认的服务端版本 */
+  baseRevision: number | null
+  /** 由应用服务生成的版本化、已校验业务快照；delete 可为空 */
+  payload: unknown | null
+  createdAt: UTCDateTime
+  attemptCount: number
+  nextAttemptAt: UTCDateTime | null
+}
+
+interface SyncConflict {
+  id: UUID
+  accountSubject: string
+  entityType: SyncEntityType
+  entityId: UUID
+  localPayload: unknown | null
+  serverPayload: unknown | null
+  baseRevision: number | null
+  serverRevision: number
+  detectedAt: UTCDateTime
+  resolvedAt: UTCDateTime | null
+}
+
+interface SyncCursor {
+  accountSubject: string
+  cursor: string | null
+  updatedAt: UTCDateTime
+}
+
+interface SyncProfile {
+  id: 'singleton'
+  accountSubject: string | null
+  enabled: boolean
+  installationId: UUID
+  bootstrapState: 'not-started' | 'uploading' | 'ready' | 'failed'
+  lastSuccessfulSyncAt: UTCDateTime | null
+}
+```
+
+约束：
+
+- `installationId` 是随机安装标识，只用于幂等和诊断，不作为浏览器指纹，也不写入业务备份。
+- `accountSubject` 使用认证后端提供的稳定主体 ID；UI 不可修改。
+- 未启用同步的本地修改不创建 outbox，首次 bootstrap 直接读取一致业务快照；启用同步后的 outbox 项必须绑定最后确认的账号。重新登录不同账号时必须停止并隔离队列，不能改写其归属。
+- 业务写入和对应 `SyncOutboxItem` 必须在同一个 IndexedDB 事务中提交。
+- `SyncOutboxItem.payload` 在出队前必须再次通过当前同步协议 schema 校验。
+- 退出登录不删除以上数据；切换到不同账号时不得复用前一账号的游标、版本或队列。Phase 5 首版不支持在同一浏览器无缝切换多个账号，检测到不一致时必须停止同步。
+
+## 17. 云端关系模型
+
+所有云端业务表均包含以下同步列：
+
+```ts
+interface CloudColumns {
+  userId: string
+  id: UUID
+  revision: number // 从 1 开始，每次接受写入 +1
+  serverUpdatedAt: UTCDateTime
+  deletedAt: UTCDateTime | null // 同步墓碑；不等同于 Task 业务软删除字段
+}
+```
+
+为避免 Task 本身已有 `deletedAt` 产生歧义，实际 SQL 推荐把同步墓碑命名为 `sync_deleted_at`；Task 业务快照中的 `deletedAt` 仍按原语义保留。云端表建议如下：
+
+```text
+cloud_tasks
+  user_id, id, payload, revision, server_updated_at, sync_deleted_at
+
+cloud_projects
+  user_id, id, payload, revision, server_updated_at, sync_deleted_at
+
+cloud_tags
+  user_id, id, payload, revision, server_updated_at, sync_deleted_at
+
+cloud_settings
+  user_id, id='singleton', payload, revision, server_updated_at, sync_deleted_at
+
+processed_mutations
+  user_id, mutation_id, installation_id, result_revision, processed_at
+
+sync_changes
+  sequence, user_id, entity_type, entity_id, revision,
+  server_updated_at, sync_deleted_at
+
+sync_bootstraps
+  user_id, bootstrap_id, status, expected_counts, received_counts,
+  created_at, completed_at
+```
+
+说明：
+
+- 业务 payload 可以先用 JSONB 保存与本地 schema 对齐的受验证快照；常用查询或完整服务端查询成为需求后，再把字段正规化。不得把未校验 JSON 直接回传客户端。
+- 所有主键或唯一约束必须包含 `user_id`；`processed_mutations` 对 `(user_id, mutation_id)` 唯一。
+- `sync_changes.sequence` 是服务端生成的单调游标来源，客户端不得构造。
+- 服务端在同一事务中写业务表、幂等记录和变更日志。
+- 服务端校验 Task 的项目/标签引用属于同一用户；不得只验证 ID 存在。
+- Task 的普通“删除”仍映射为业务 payload 中的 `Task.deletedAt`；服务端可同时保留最后快照和同步墓碑，客户端恢复时仍能还原该任务。Tag 等真正移除本地实体的操作使用仅表示实体消失的同步墓碑，并在同一事务中清理引用。
+
+## 18. 同步写入规则
+
+一次本地修改：
+
+1. 应用服务生成新业务实体与稳定 `mutationId`。
+2. 在同一 Dexie 事务中写业务实体、`SyncRecord(state='pending')` 和 `SyncOutboxItem`。
+3. 同步器提交 `mutationId`、`installationId`、实体类型、操作、`baseRevision` 和 payload。
+4. 服务端验证会话、用户边界、协议版本、引用和字段不变量。
+5. 若 `mutationId` 已处理，返回原结果，不重复写入。
+6. 若 `baseRevision` 与当前 revision 一致，服务端事务性接受并递增 revision。
+7. 若版本不一致，返回冲突及当前服务端快照；客户端创建 `SyncConflict`，不得删除原 outbox 内容。
+8. 接受后客户端更新 `serverRevision`、移除对应 outbox，并标记 `synced`。
+
+同一实体的多次未发送本地修改可以在客户端压缩，但必须保持最终操作、首次 `baseRevision` 和删除语义正确；实现前需用单元测试证明压缩规则。
+
+## 19. 增量拉取与删除墓碑
+
+- 客户端以 `SyncCursor.cursor` 拉取该用户在游标之后的有序变更。
+- 服务端返回变更快照或墓碑，以及只有服务端能够签发/解释的下一游标。
+- 客户端在单一 Dexie 事务中应用一个拉取页，再推进游标；应用失败时游标不得前进。
+- 无本地待提交修改时，较新 revision 覆盖本地业务快照并更新 `SyncRecord`。
+- 存在本地待提交修改且服务端 revision 前进时，进入冲突，不自动覆盖。
+- 墓碑使离线旧设备能够得知删除。Task 墓碑在保留期内携带最后一个受验证快照，以支持现有软删除/撤销语义；Tag 墓碑可不携带 payload。墓碑保留策略在上线前按最长支持离线周期确定；没有完成全量重建机制前不得硬删除墓碑。
+
+## 20. 首次迁移与 JSON 恢复
+
+首次迁移：
+
+1. 读取一致的本地业务快照并生成摘要。
+2. 查询云端是否为空；“为空”表示没有业务实体、墓碑、未完成 bootstrap 或同步历史，只有该状态才进入自动 bootstrap。
+3. 用户确认后创建 `bootstrapId`，按有界批次上传。
+4. 服务端校验预期数量、实体引用和每批幂等性。
+5. 所有批次完成后，服务端在事务边界内把 bootstrap 标为完成并返回初始游标。
+6. 客户端收到完成确认后设置 `bootstrapState='ready'`；整个过程中不清空本地业务表。
+
+JSON 业务备份继续使用第 11 节格式，不包含认证和同步内部表。已启用同步时执行“替换恢复”必须先暂停同步，并在事务前取得恢复前业务快照：备份中新增或变化的实体生成 upsert；恢复前存在但备份中不存在的已同步实体生成 delete；已有实体沿用已知 `serverRevision`。业务表替换、同步元数据重建和 outbox 生成必须在同一个本地事务中完成。用户再次明确确认后才推送，服务端仍执行版本检查；因此恢复不能绕过冲突保护直接覆盖云端。

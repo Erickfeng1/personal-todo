@@ -9,7 +9,7 @@
 | ID | 决策 | 状态 | 日期 |
 |---|---|---|---|
 | D-001 | MVP 采用响应式 Web/PWA | Accepted | 2026-08-11 |
-| D-002 | 本地优先、无需登录 | Accepted | 2026-08-11 |
+| D-002 | 本地优先、无需登录 | Superseded | 2026-08-11 |
 | D-003 | 分离计划日期与截止日期 | Accepted | 2026-08-11 |
 | D-004 | 一个项目、多个标签 | Accepted | 2026-08-11 |
 | D-005 | Today 等页面为派生视图 | Accepted | 2026-08-11 |
@@ -19,8 +19,13 @@
 | D-009 | UI 不直接操作数据库 | Accepted | 2026-08-11 |
 | D-010 | 默认不引入大型全局状态库 | Accepted | 2026-08-11 |
 | D-011 | Upcoming 先采用七天列表 | Accepted | 2026-08-11 |
-| D-012 | MVP 不建设后端 | Accepted | 2026-08-11 |
+| D-012 | MVP 不建设后端 | Superseded | 2026-08-11 |
 | D-013 | 用重要性与紧急性两轴替代单一优先级 | Accepted | 2026-08-11 |
+| D-014 | Phase 5 增加可选私有云同步 | Accepted | 2026-08-19 |
+| D-015 | 使用 outbox、乐观版本和显式冲突解决 | Accepted | 2026-08-19 |
+| D-016 | 云端采用 Vercel Functions 与托管 PostgreSQL | Accepted | 2026-08-19 |
+| D-017 | Phase 5A 采用 Clerk 与 Neon Serverless Driver | Accepted | 2026-08-19 |
+| D-018 | 增量拉取游标由服务端签名并绑定用户 | Accepted | 2026-08-20 |
 
 ---
 
@@ -36,7 +41,7 @@
 
 ## D-002 本地优先、无需登录
 
-- 状态：Accepted
+- 状态：Superseded（MVP 历史基线仍有效；当前产品范围由 D-014 扩展）
 - 日期：2026-08-11
 - 背景：单人个人工具的首要价值是打开即用和数据控制，而不是协作。
 - 决策：MVP 数据保存在 IndexedDB；无需账号；不上传任务内容。
@@ -44,6 +49,7 @@
 - 代价：清除浏览器站点数据可能造成丢失；MVP 无多设备同步。
 - 缓解：导出恢复进入 P0；设置页明确风险。
 - 后续触发：连续使用后出现稳定的跨设备需求，再设计可选同步，而不是直接把本地表暴露给云端。
+- 替代：D-014。保留“本地优先”和未登录可用，取消“产品永远无需登录/不上传”的全局限制。
 
 ## D-003 分离计划日期与截止日期
 
@@ -133,13 +139,14 @@
 
 ## D-012 MVP 不建设后端
 
-- 状态：Accepted
+- 状态：Superseded（MVP 交付方式的历史记录；Phase 5 由 D-014、D-016 扩展）
 - 日期：2026-08-11
 - 背景：账号、鉴权、API、数据库、备份、同步和冲突解决会把个人 MVP 变成完整 SaaS。
 - 决策：MVP 静态部署，不包含任务 API 或云数据库。
 - 理由：优先验证用户是否愿意持续使用产品模型。
 - 代价：无多设备同步和远程备份。
 - 后续触发：跨设备成为高频刚需时，单独形成同步架构文档和隐私模型。
+- 替代：D-014、D-016。MVP 静态版本仍可运行，但 Phase 5 部署新增受鉴权 API 和托管数据库。
 
 ## D-013 用重要性与紧急性两轴替代单一优先级
 
@@ -151,6 +158,62 @@
 - 代价：筛选 UI 和导入校验增加两个字段；旧的“优先级排序”改为“四象限排序”。
 - 被拒绝方案：把四个词写入普通 `tagIds`；同时保留单一优先级；创建时强制选择两个维度。
 - 后续触发：真实使用证明需要独立矩阵操作时，再增加四象限页面；MVP 只做分类标识、筛选和排序。
+
+## D-014 Phase 5 增加可选私有云同步
+
+- 状态：Accepted
+- 日期：2026-08-19
+- 背景：IndexedDB 按浏览器 profile、协议、域名和端口隔离；切换 `localhost`/`127.0.0.1`、开发端口、Vercel Preview 或设备时，原数据不会自动出现，用户会感知为历史记录消失。
+- 决策：增加 Phase 5 可选登录与私有云同步。IndexedDB 仍是即时 UI 和离线工作的本地数据源；登录、首次上传确认后，PostgreSQL 保存用户的跨设备副本。
+- 理由：解决跨源、跨浏览器和跨设备连续性，同时保留快速创建、离线使用和未登录本地模式。
+- 代价：新增账号、隐私披露、API、数据库 migration、同步状态、冲突、监控和运维成本。
+- 被拒绝方案：只改用 `localStorage`；它仍受 origin 隔离且事务/容量更弱。只把 Dexie 数据定期整库覆盖到云端；它会引入并发覆盖和删除复活风险。登录后自动上传；缺少明确同意。
+- 后续触发：如果真实使用只需要远程备份而不需要多设备编辑，可缩减为单向备份；如果需要团队协作，必须另建权限和共享模型。
+- 替代/被替代：扩展并替代 D-002、D-012 的全局限制，但保留两者作为 MVP 历史基线。
+
+## D-015 使用 outbox、乐观版本和显式冲突解决
+
+- 状态：Accepted
+- 日期：2026-08-19
+- 背景：本地优先意味着用户操作不能等待网络；多个设备可能基于旧数据修改同一实体。
+- 决策：每次业务写入与 outbox 在同一 IndexedDB 事务中提交；云端 mutation 按 ID 幂等；实体使用 `revision/baseRevision` 乐观并发控制；冲突保留本地与云端版本并由用户明确解决；删除通过墓碑传播。
+- 理由：保证离线操作可靠、网络重试不重复、并发修改不被静默覆盖、旧设备不会复活删除数据。
+- 代价：需要同步元数据表、冲突 UI、变更游标、墓碑保留和更多集成/E2E 测试。
+- 被拒绝方案：纯时间戳 Last-Write-Wins；设备时钟不可靠且会无提示丢改动。每次下载/上传整库；冲突和带宽不可控。
+- 后续触发：冲突频率显著上升时，评估字段级合并或操作型同步；在有证据前不引入 CRDT。
+
+## D-016 云端采用 Vercel Functions 与托管 PostgreSQL
+
+- 状态：Accepted
+- 日期：2026-08-19
+- 背景：现有应用已使用 Vercel，数据具有明确关系、引用完整性、事务和版本检查需求；旧的第一方 Vercel Postgres 接口不再作为新项目选择。
+- 决策：保留 React/Vite 前端，使用 Vercel Functions 提供鉴权同步 API，并从 Vercel Marketplace 连接托管 PostgreSQL；优先以 Neon Postgres 做 Phase 5A spike。身份层使用支持 React SPA 和服务端令牌验证的 OIDC 提供商，具体提供商与 SQL 工具在 spike 后补充决策。
+- 理由：PostgreSQL 适合用户隔离、唯一约束、事务、幂等和变更日志；Vercel Functions 与现有部署方式相容；无需仅为认证迁移到 Next.js。
+- 代价：Preview/Production 环境隔离、冷启动/连接方式、数据库分支、认证供应商和 migration 流程都需要配置与持续维护。
+- 被拒绝方案：浏览器直连数据库；会暴露权限边界和凭据。仅使用 Vercel Runtime Cache；它是缓存而非持久数据库。仅使用 Blob 存整库 JSON；不适合并发、引用校验和增量同步。
+- 后续触发：Phase 5A spike 若发现运行时、区域、成本或认证集成不满足要求，可改用另一 Vercel Marketplace Postgres 或整合认证的 Postgres 服务，但不得改变 API、用户隔离和本地优先原则。
+
+## D-017 Phase 5A 采用 Clerk 与 Neon Serverless Driver
+
+- 状态：Accepted
+- 日期：2026-08-19
+- 背景：D-016 要求通过 Phase 5A spike 锁定 React/Vite 可用的认证方案、Vercel Functions 的令牌验证方式，以及 Neon 的无服务器连接和 migration 工具。
+- 决策：前端认证采用 `@clerk/react`，Vite 明确允许 Marketplace 提供的 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` 公共前缀；Vercel Functions 使用 `@clerk/backend` 的 `authenticateRequest` 验证 session token，并配置精确的 `authorizedParties`；服务端用户边界只取验证结果中的稳定 `userId`。PostgreSQL 使用 `@neondatabase/serverless` 参数化访问，schema 由带 checksum、事务和 advisory lock 的版本化 SQL migration 管理，暂不引入 ORM。Preview/测试数据库与 Production 隔离；mutation 类脚本必须通过 `DATABASE_ENVIRONMENT` 安全门。
+- 理由：Clerk 对 React SPA 与服务端 Web `Request` 验证有稳定的一致路径；Neon HTTP driver 适合 Vercel Functions，直接 SQL 足以表达当前 JSONB 同步信封与复合用户主键，并减少无实际收益的依赖。
+- 代价：Clerk 和 Neon 是两个外部服务，需分别管理 Preview/Production 环境变量和服务状态；SQL 类型安全主要依靠参数化查询、Zod 边界与集成测试，而不是 ORM 生成类型。
+- 被拒绝方案：Neon Auth 当前 SDK 仍为 beta，依赖 spike 引入了大量额外包并出现 peer dependency 冲突；本阶段不采用。Drizzle ORM/Kit 对当前仅建立同步信封的 schema 增益不足，并增加构建与审计面；暂不采用。客户端直连 Neon 或信任客户端 owner 字段会破坏用户隔离，禁止采用。
+- 后续触发：若 Clerk 成本、离线会话行为或 Vercel 集成不满足验收要求，重新比较其他 OIDC 提供商；若服务端查询明显复杂化或 schema 类型漂移成为持续问题，再评估引入 ORM/代码生成。
+
+## D-018 增量拉取游标由服务端签名并绑定用户
+
+- 状态：Accepted
+- 日期：2026-08-20
+- 背景：`sync_changes.sequence` 适合数据库增量分页，但客户端不能用裸 sequence 自行构造跨账号或任意位置的同步请求；Vercel Functions 又不应为了每个游标增加一张临时会话表。
+- 决策：首版 `pull` 游标由服务端生成，内容带协议版本和最后 sequence，并用 HMAC-SHA256 对 `版本 + 已验证 userId + sequence` 签名。解码必须使用当前会话 userId 验签；响应变更不额外暴露内部 sequence。签名密钥只放在 Vercel 服务端环境变量。
+- 理由：保持 Function 无状态和分页可恢复，同时阻止篡改及跨用户复用；客户端只保存并原样回传 opaque cursor，不参与 owner 或 sequence 判断。
+- 代价：签名只保证完整性而非加密，游标 payload 本身不承载业务内容；轮换密钥会使旧游标失效，客户端必须能从空游标安全重拉。Development、Preview、Production 需要各自管理独立密钥。
+- 被拒绝方案：直接接受客户端数字 sequence，无法防止随意构造；只在数据库保存随机 cursor，会增加状态清理和额外查询；把 userId 放入请求体或游标但不验签，仍会信任客户端所有者信息。
+- 后续触发：若需要平滑密钥轮换，增加带 key ID 的多密钥验签窗口；若游标开始包含敏感元数据，改为服务端随机映射或认证加密格式。
 
 ---
 

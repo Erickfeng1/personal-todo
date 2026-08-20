@@ -13,6 +13,7 @@ import type {
   WeekStartsOn
 } from '../domain/settings/settings.types'
 import { useDataStatistics, useSettings } from '../hooks/useSettings'
+import { AccountSyncSection } from '../features/account-sync/AccountSyncSection'
 
 function backupFileName(exportedAt: string): string {
   const date = new Date(exportedAt)
@@ -155,6 +156,8 @@ export function SettingsPage() {
           {message}
         </div>
       ) : null}
+
+      <AccountSyncSection statistics={statistics} />
 
       <section className="settings-section" aria-labelledby="appearance-title">
         <div className="settings-section-header">
@@ -322,8 +325,7 @@ export function SettingsPage() {
           <h2 id="about-title">本地优先说明</h2>
         </div>
         <p>
-          清除浏览器站点数据会删除本地任务，请定期导出备份。序 Todo
-          不包含账号、云同步或任务数据上传。
+          清除浏览器站点数据会删除本地任务，请定期导出备份。登录本身不会上传任务；只有在后续明确启用同步后，任务数据才会写入云端。
         </p>
         <dl>
           <div>
