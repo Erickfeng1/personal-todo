@@ -1,4 +1,4 @@
-import type { UTCDateTime } from '../task/task.types'
+import type { UTCDateTime } from '../task/task.types.js'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type WeekStartsOn = 0 | 1

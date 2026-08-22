@@ -16,16 +16,14 @@
     "test:e2e": "playwright test",
     "test:integration": "RUN_DATABASE_INTEGRATION=true dotenv -e .env.local -- vitest run --config vitest.integration.config.ts",
     "auth:check": "dotenv -e .env.local -- tsx scripts/auth-check.ts",
+    "auth:generate": "tsx scripts/generate-access-secrets.ts",
     "db:check": "dotenv -e .env.local -- tsx scripts/db-check.ts",
     "db:migrate": "dotenv -e .env.local -- tsx scripts/db-migrate.ts",
     "functions:check": "dotenv -e .env.local -- tsx scripts/functions-check.ts"
   },
   "dependencies": {
-    "@clerk/backend": "^3.16.8",
-    "@clerk/react": "^6.14.4",
     "@neondatabase/serverless": "^1.1.0",
     "dexie": "4.4.4",
-    "dexie-react-hooks": "4.4.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router-dom": "7.18.2",

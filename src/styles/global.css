@@ -2005,3 +2005,80 @@ input:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+.access-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(
+      circle at 20% 10%,
+      rgba(199, 98, 48, 0.12),
+      transparent 32%
+    ),
+    var(--color-canvas, #f4f0e8);
+}
+
+.access-card {
+  width: min(100%, 440px);
+  padding: 42px;
+  border: 1px solid rgba(31, 48, 43, 0.16);
+  border-radius: 28px;
+  background: var(--color-surface, #fffdf9);
+  box-shadow: 0 24px 70px rgba(31, 48, 43, 0.14);
+}
+
+.access-card .brand-mark {
+  display: grid;
+  place-items: center;
+  margin-bottom: 28px;
+}
+
+.access-card h1 {
+  margin: 4px 0 12px;
+  font-size: clamp(34px, 8vw, 52px);
+}
+
+.access-card form {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0 20px;
+}
+
+.access-card label {
+  font-weight: 700;
+}
+
+.access-card input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid rgba(31, 48, 43, 0.3);
+  border-radius: 12px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+
+.access-card .primary-button {
+  min-height: 50px;
+}
+
+.access-card > .primary-button {
+  display: block;
+  margin: 24px 0 18px;
+}
+
+.access-card small {
+  display: block;
+  color: var(--color-text-muted, #66736e);
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .access-card {
+    padding: 30px 22px;
+    border-radius: 22px;
+  }
+}

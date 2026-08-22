@@ -21,11 +21,13 @@
 | D-011 | Upcoming 先采用七天列表 | Accepted | 2026-08-11 |
 | D-012 | MVP 不建设后端 | Superseded | 2026-08-11 |
 | D-013 | 用重要性与紧急性两轴替代单一优先级 | Accepted | 2026-08-11 |
-| D-014 | Phase 5 增加可选私有云同步 | Accepted | 2026-08-19 |
-| D-015 | 使用 outbox、乐观版本和显式冲突解决 | Accepted | 2026-08-19 |
+| D-014 | Phase 5 增加可选私有云同步 | Superseded | 2026-08-19 |
+| D-015 | 使用 outbox、乐观版本和显式冲突解决 | Superseded | 2026-08-19 |
 | D-016 | 云端采用 Vercel Functions 与托管 PostgreSQL | Accepted | 2026-08-19 |
-| D-017 | Phase 5A 采用 Clerk 与 Neon Serverless Driver | Accepted | 2026-08-19 |
-| D-018 | 增量拉取游标由服务端签名并绑定用户 | Accepted | 2026-08-20 |
+| D-017 | Phase 5A 采用 Clerk 与 Neon Serverless Driver | Superseded | 2026-08-19 |
+| D-018 | 增量拉取游标由服务端签名并绑定用户 | Superseded | 2026-08-20 |
+| D-019 | Clerk Production 域名接入方式待定 | Superseded | 2026-08-20 |
+| D-020 | 单用户密码保护，Neon 作为唯一业务数据源 | Accepted | 2026-08-21 |
 
 ---
 
@@ -161,7 +163,7 @@
 
 ## D-014 Phase 5 增加可选私有云同步
 
-- 状态：Accepted
+- 状态：Superseded（由 D-020 取代）
 - 日期：2026-08-19
 - 背景：IndexedDB 按浏览器 profile、协议、域名和端口隔离；切换 `localhost`/`127.0.0.1`、开发端口、Vercel Preview 或设备时，原数据不会自动出现，用户会感知为历史记录消失。
 - 决策：增加 Phase 5 可选登录与私有云同步。IndexedDB 仍是即时 UI 和离线工作的本地数据源；登录、首次上传确认后，PostgreSQL 保存用户的跨设备副本。
@@ -173,7 +175,7 @@
 
 ## D-015 使用 outbox、乐观版本和显式冲突解决
 
-- 状态：Accepted
+- 状态：Superseded（由 D-020 取代；保留 revision 并发保护）
 - 日期：2026-08-19
 - 背景：本地优先意味着用户操作不能等待网络；多个设备可能基于旧数据修改同一实体。
 - 决策：每次业务写入与 outbox 在同一 IndexedDB 事务中提交；云端 mutation 按 ID 幂等；实体使用 `revision/baseRevision` 乐观并发控制；冲突保留本地与云端版本并由用户明确解决；删除通过墓碑传播。
@@ -195,7 +197,7 @@
 
 ## D-017 Phase 5A 采用 Clerk 与 Neon Serverless Driver
 
-- 状态：Accepted
+- 状态：Superseded（Neon 继续使用，Clerk 由 D-020 取代）
 - 日期：2026-08-19
 - 背景：D-016 要求通过 Phase 5A spike 锁定 React/Vite 可用的认证方案、Vercel Functions 的令牌验证方式，以及 Neon 的无服务器连接和 migration 工具。
 - 决策：前端认证采用 `@clerk/react`，Vite 明确允许 Marketplace 提供的 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` 公共前缀；Vercel Functions 使用 `@clerk/backend` 的 `authenticateRequest` 验证 session token，并配置精确的 `authorizedParties`；服务端用户边界只取验证结果中的稳定 `userId`。PostgreSQL 使用 `@neondatabase/serverless` 参数化访问，schema 由带 checksum、事务和 advisory lock 的版本化 SQL migration 管理，暂不引入 ORM。Preview/测试数据库与 Production 隔离；mutation 类脚本必须通过 `DATABASE_ENVIRONMENT` 安全门。
@@ -206,7 +208,7 @@
 
 ## D-018 增量拉取游标由服务端签名并绑定用户
 
-- 状态：Accepted
+- 状态：Superseded（云端直读写不再使用增量同步游标）
 - 日期：2026-08-20
 - 背景：`sync_changes.sequence` 适合数据库增量分页，但客户端不能用裸 sequence 自行构造跨账号或任意位置的同步请求；Vercel Functions 又不应为了每个游标增加一张临时会话表。
 - 决策：首版 `pull` 游标由服务端生成，内容带协议版本和最后 sequence，并用 HMAC-SHA256 对 `版本 + 已验证 userId + sequence` 签名。解码必须使用当前会话 userId 验签；响应变更不额外暴露内部 sequence。签名密钥只放在 Vercel 服务端环境变量。
@@ -214,6 +216,29 @@
 - 代价：签名只保证完整性而非加密，游标 payload 本身不承载业务内容；轮换密钥会使旧游标失效，客户端必须能从空游标安全重拉。Development、Preview、Production 需要各自管理独立密钥。
 - 被拒绝方案：直接接受客户端数字 sequence，无法防止随意构造；只在数据库保存随机 cursor，会增加状态清理和额外查询；把 userId 放入请求体或游标但不验签，仍会信任客户端所有者信息。
 - 后续触发：若需要平滑密钥轮换，增加带 key ID 的多密钥验签窗口；若游标开始包含敏感元数据，改为服务端随机映射或认证加密格式。
+
+## D-019 Clerk Production 域名接入方式待定
+
+- 状态：Superseded（D-020 移除 Clerk）
+- 日期：2026-08-20
+- 背景：独立 Production Clerk 资源已创建并注入 `pk_live_`/`sk_live_`，但当前正式站点使用 `personal-todo-mauve.vercel.app`。Clerk Production 需要可配置 DNS 的自有域名；由 publishable key 派生的 `clerk.personal-todo-mauve.vercel.app` 无法连接，导致 ClerkJS 初始化失败。
+- 决策：优先绑定用户拥有的自定义域名并按 Clerk 要求配置 DNS。若用户当前没有自定义域名，可另行批准 Clerk Frontend API Proxy 方案；该方案必须先实现同源代理、正确转发原始客户端 IP、补充自动化测试，再在 Clerk 实例启用 proxy URL。选择完成前不宣称 Production 登录可用。
+- 理由：自定义域名是 Clerk 官方推荐和支持程度最高的 Production 路径；代理可以绕过 CNAME 限制，但属于高级集成，会增加服务端转发、安全校验和运行维护责任。
+- 代价：自定义域名需要域名所有权和 DNS 配置；代理方案需要新增 Function/路由、客户端 `proxyUrl` 配置、Clerk Backend API 设置及长期监控。
+- 被拒绝方案：继续使用当前 `*.vercel.app` 派生的 Clerk Frontend API 域名；该域名无法配置 Clerk 所需 DNS，已由线上 ClerkJS 加载失败验证。把 Development Clerk key 用于 Production；会混用测试与正式身份数据并违反环境隔离。
+- 后续触发：用户提供可用自定义域名时采用推荐路径；用户明确接受高级代理方案时，将本决策改为 Accepted 并补充实现细节与验收结果。
+
+## D-020 单用户密码保护，Neon 作为唯一业务数据源
+
+- 状态：Accepted
+- 日期：2026-08-21
+- 背景：产品只有一个固定使用者，不需要账号注册、团队隔离或第三方身份档案；Clerk Production 又要求当前 `*.vercel.app` 无法提供的自定义域名。更重要的是，本地优先同步仍让浏览器数据库成为一个容易误解和丢失的事实来源。
+- 决策：移除 Clerk 和可选本地模式；使用服务端配置的慢哈希访问密码建立短期 HttpOnly 会话。Neon 成为任务、项目、标签和设置的唯一持久事实来源，客户端仅保留当前会话内存快照。现有 IndexedDB 仅用于一次性、显式确认的迁移读取，不再接收日常业务写入。
+- 理由：符合单人使用边界，消除第三方认证域名依赖和双数据源同步复杂度；所有设备刷新后都从同一云端事实重建界面。
+- 代价：网络不可用时不能创建或修改任务；访问密码丢失需要重新配置服务端环境变量；服务端 API、数据库和会话安全成为应用可用性的必要依赖。
+- 被拒绝方案：继续 Clerk 并购买/绑定域名，需求与单用户场景不匹配；无认证公开数据库会把私人任务暴露给任何访问者；把共享密钥放前端会被构建产物和浏览器网络请求暴露；继续本地优先同步会保留双事实来源。
+- 后续触发：需要多人独立账户、分享或第三方登录时，重新引入正式身份提供商和按用户/组织隔离的数据模型；需要离线写入时，另行设计可审计的队列和冲突策略。
+- 替代/被替代：取代 D-014、D-015 的本地优先同步部分、D-017 的 Clerk 选择、D-018 和 D-019；保留 D-016 的 Vercel Functions + Neon 选择。
 
 ---
 

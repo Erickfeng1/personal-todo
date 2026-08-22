@@ -1,7 +1,7 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { taskRepository } from '../app/services'
 import { getTodayLocal } from '../domain/date/local-date'
 import type { Task } from '../domain/task/task.types'
+import { useCloudQuery } from './useCloudQuery'
 
 export type TaskCollection =
   'inbox' | 'today' | 'upcoming' | 'project' | 'tag' | 'all' | 'completed'
@@ -14,7 +14,7 @@ export function useTaskCollection(
 ): Task[] | undefined {
   const today = getTodayLocal()
 
-  return useLiveQuery(async () => {
+  return useCloudQuery(async () => {
     if (!enabled) return []
     if (collection === 'inbox') return taskRepository.queryInbox()
     if (collection === 'completed') return taskRepository.queryCompleted()

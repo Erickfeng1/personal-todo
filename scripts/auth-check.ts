@@ -1,13 +1,13 @@
-import { createClerkClient } from '@clerk/backend'
-import { parseAuthEnv } from '../server/env'
+import { verifyPassword } from '../server/auth/password-hash'
+import { parseAuthEnv, getAuthorizedParties } from '../server/env'
 
 const environment = parseAuthEnv()
-const clerk = createClerkClient({
-  secretKey: environment.CLERK_SECRET_KEY,
-  publishableKey: environment.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  telemetry: { disabled: true }
-})
+getAuthorizedParties(environment)
+await verifyPassword(
+  '__configuration_check_only__',
+  environment.SINGLE_USER_PASSWORD_HASH
+)
 
-await clerk.users.getUserList({ limit: 1 })
-
-console.info('Clerk credentials are healthy.')
+console.info(
+  'Single-user password hash, session secret, and origins are configured.'
+)

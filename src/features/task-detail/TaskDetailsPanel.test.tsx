@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { taskService } from '../../app/services'
@@ -66,11 +66,18 @@ describe('TaskDetailsPanel', () => {
       />
     )
 
-    await user.clear(screen.getByLabelText('标题'))
-    await user.type(screen.getByLabelText('标题'), '梳理本周计划')
-    await user.type(screen.getByLabelText('备注'), '先完成需求拆解')
-    await user.type(screen.getByLabelText('计划日期'), '2026-08-12')
-    await user.type(screen.getByLabelText('截止日期'), '2026-08-15')
+    fireEvent.change(screen.getByLabelText('标题'), {
+      target: { value: '梳理本周计划' }
+    })
+    fireEvent.change(screen.getByLabelText('备注'), {
+      target: { value: '先完成需求拆解' }
+    })
+    fireEvent.change(screen.getByLabelText('计划日期'), {
+      target: { value: '2026-08-12' }
+    })
+    fireEvent.change(screen.getByLabelText('截止日期'), {
+      target: { value: '2026-08-15' }
+    })
     await user.click(screen.getByRole('button', { name: /^重要$/ }))
     await user.click(screen.getByRole('button', { name: /^紧急$/ }))
     await user.click(screen.getByRole('button', { name: '保存修改' }))
@@ -86,7 +93,8 @@ describe('TaskDetailsPanel', () => {
       projectId: null,
       tagIds: []
     })
-    expect(screen.getByRole('status')).toHaveTextContent('已保存在本设备')
+    expect(screen.getByRole('status')).toHaveTextContent('已保存到云端')
+    expect(screen.getByText('Neon 云数据库')).toBeInTheDocument()
   })
 
   it('discards an edited draft when the user cancels', async () => {

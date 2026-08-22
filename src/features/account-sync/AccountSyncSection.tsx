@@ -1,136 +1,135 @@
-import type { DataStatistics } from '../../data/backup/backup.types'
+import { useEffect, useState } from 'react'
+import type {
+  BackupSummary,
+  DataStatistics
+} from '../../data/backup/backup.types'
 import { useCloudAuth } from '../../auth/cloud-auth-context'
-import { useCloudSyncInspection } from '../../hooks/useCloudSyncInspection'
-import type { CloudSyncClient } from '../../sync/cloud-sync-client'
+import { legacyLocalDataReader } from '../../data/migration/legacy-local-data'
+import { cloudStore } from '../../cloud/cloud-store'
 
 interface AccountSyncSectionProps {
   statistics: DataStatistics | undefined
-  client?: CloudSyncClient
 }
 
-function localTaskCount(statistics: DataStatistics | undefined): number | null {
-  if (!statistics) return null
-  return (
-    statistics.activeTaskCount +
-    statistics.completedTaskCount +
-    statistics.deletedTaskCount
+function hasLegacyData(summary: BackupSummary | null): boolean {
+  return Boolean(
+    summary &&
+    (summary.taskCount > 0 || summary.projectCount > 0 || summary.tagCount > 0)
   )
 }
 
-export function AccountSyncSection({
-  statistics,
-  client
-}: AccountSyncSectionProps) {
+export function AccountSyncSection({ statistics }: AccountSyncSectionProps) {
   const auth = useCloudAuth()
-  const cloud = useCloudSyncInspection(client)
-  const taskCount = localTaskCount(statistics)
+  const [legacySummary, setLegacySummary] = useState<BackupSummary | null>(null)
+  const [migrationState, setMigrationState] = useState<
+    'idle' | 'running' | 'done' | 'error'
+  >('idle')
+
+  useEffect(() => {
+    void legacyLocalDataReader
+      .getSummary()
+      .then(setLegacySummary)
+      .catch(() => setLegacySummary(null))
+  }, [])
+
+  const cloudEmpty = Boolean(
+    statistics &&
+    statistics.activeTaskCount === 0 &&
+    statistics.completedTaskCount === 0 &&
+    statistics.deletedTaskCount === 0 &&
+    statistics.projectCount === 0 &&
+    statistics.tagCount === 0
+  )
+
+  const migrate = async () => {
+    const summary = legacySummary
+    if (!summary || !hasLegacyData(summary) || !cloudEmpty) return
+    const confirmed = window.confirm(
+      `将导入 ${String(summary.taskCount)} 项任务、${String(summary.projectCount)} 个项目和 ${String(summary.tagCount)} 个标签到云端。旧浏览器数据会继续保留。确认继续吗？`
+    )
+    if (!confirmed) return
+    setMigrationState('running')
+    try {
+      await cloudStore.restore(await legacyLocalDataReader.export(), 'migrate')
+      setMigrationState('done')
+    } catch {
+      setMigrationState('error')
+    }
+  }
 
   return (
     <section className="settings-section" aria-labelledby="account-title">
       <div className="settings-section-header">
         <div>
-          <span>ACCOUNT</span>
-          <h2 id="account-title">账号与同步</h2>
+          <span>PRIVATE CLOUD</span>
+          <h2 id="account-title">访问与云端数据</h2>
         </div>
-        <p>登录只会读取云端概况，不会自动上传或覆盖本地数据。</p>
+        <p>Neon 是任务、项目、标签和设置的唯一持久数据源。</p>
       </div>
 
-      {auth.status === 'loading' ? (
-        <p className="account-status" role="status">
-          正在恢复账号会话…
-        </p>
-      ) : null}
-
-      {auth.status === 'unavailable' ? (
-        <div className="account-panel">
-          <div>
-            <h3>当前保持本地模式</h3>
-            <p>认证尚未配置，本地任务、筛选和备份功能不受影响。</p>
-          </div>
+      <div className="account-panel">
+        <div>
+          <h3>{auth.userLabel ?? '私人云端'}</h3>
+          <p>访问会话有效；所有写入均等待云数据库确认。</p>
         </div>
-      ) : null}
+        <button
+          type="button"
+          className="secondary-button account-action"
+          onClick={() => void auth.signOut()}
+        >
+          锁定并退出
+        </button>
+      </div>
 
-      {auth.status === 'signed-out' ? (
-        <div className="account-panel">
-          <div>
-            <h3>未登录</h3>
-            <p>登录后可以检查云端是否已有数据。启用首次同步仍需要单独确认。</p>
-          </div>
+      <div className="sync-summary" aria-label="云端数据概况">
+        <div>
+          <span>CLOUD TASKS</span>
+          <strong>
+            {statistics
+              ? statistics.activeTaskCount +
+                statistics.completedTaskCount +
+                statistics.deletedTaskCount
+              : '—'}
+          </strong>
+          <p>Neon 任务记录</p>
+        </div>
+        <div>
+          <span>LEGACY LOCAL</span>
+          <strong>{legacySummary?.taskCount ?? '—'}</strong>
+          <p>旧浏览器任务，仅用于迁移</p>
+        </div>
+      </div>
+
+      {hasLegacyData(legacySummary) && cloudEmpty ? (
+        <div className="sync-read-error">
+          <p>
+            检测到旧浏览器数据且云端为空。导入前会再次确认，成功后也不会删除旧数据。
+          </p>
           <button
             type="button"
             className="primary-button account-action"
-            onClick={auth.openSignIn}
+            disabled={migrationState === 'running'}
+            onClick={() => void migrate()}
           >
-            登录账号
+            {migrationState === 'running' ? '正在迁移…' : '导入旧数据到云端'}
           </button>
         </div>
       ) : null}
 
-      {auth.status === 'signed-in' ? (
-        <>
-          <div className="account-panel">
-            <div>
-              <h3>{auth.userLabel ?? '当前账号'}</h3>
-              <p>已登录；同步尚未启用，本地数据不会被自动上传。</p>
-            </div>
-            <button
-              type="button"
-              className="secondary-button account-action"
-              onClick={() => void auth.signOut()}
-            >
-              退出登录
-            </button>
-          </div>
-
-          <div className="sync-summary" aria-label="本地与云端数据概况">
-            <div>
-              <span>LOCAL</span>
-              <strong>{taskCount ?? '—'}</strong>
-              <p>本地任务记录</p>
-            </div>
-            <div>
-              <span>CLOUD</span>
-              <strong>
-                {cloud.status === 'ready'
-                  ? (cloud.inspection?.state.counts.tasks ?? '—')
-                  : '—'}
-              </strong>
-              <p>
-                {cloud.status === 'loading' ? '正在检查云端…' : null}
-                {cloud.status === 'ready' && cloud.inspection?.state.cloudEmpty
-                  ? '云端为空'
-                  : null}
-                {cloud.status === 'ready' &&
-                cloud.inspection?.state.cloudEmpty === false
-                  ? '云端已有数据'
-                  : null}
-                {cloud.status === 'unauthorized' ? '会话已失效' : null}
-                {cloud.status === 'error' ? '暂时无法读取' : null}
-              </p>
-            </div>
-          </div>
-
-          {cloud.status === 'unauthorized' || cloud.status === 'error' ? (
-            <div className="sync-read-error" role="status">
-              <p>
-                {cloud.status === 'unauthorized'
-                  ? '账号会话已失效，请重新登录。本地任务仍安全保存在当前设备。'
-                  : '暂时无法读取云端概况。本地功能不受影响。'}
-              </p>
-              <button
-                type="button"
-                className="secondary-button account-action"
-                onClick={cloud.retry}
-              >
-                重试
-              </button>
-            </div>
-          ) : null}
-
-          <p className="sync-disabled-note">
-            当前阶段仅验证账号与云端隔离。首次上传会在下一阶段提供独立说明与确认，不会在这里自动开始。
-          </p>
-        </>
+      {hasLegacyData(legacySummary) && !cloudEmpty ? (
+        <p className="sync-disabled-note">
+          云端已有数据，因此不会自动覆盖。请先导出云端备份；旧浏览器数据仍保持原样。
+        </p>
+      ) : null}
+      {migrationState === 'done' ? (
+        <p className="settings-message" role="status">
+          旧数据已导入云端并重新加载。
+        </p>
+      ) : null}
+      {migrationState === 'error' ? (
+        <p className="inline-error" role="alert">
+          迁移失败，旧浏览器数据没有被修改。
+        </p>
       ) : null}
     </section>
   )

@@ -1,15 +1,15 @@
 # 序 Todo
 
-一个面向个人使用、本地优先的待办任务管理工具。MVP 使用 React、TypeScript、Vite 和 Dexie 构建，任务数据保存在当前浏览器的 IndexedDB 中。
+一个面向个人使用的私人云端待办工具。前端使用 React、TypeScript 和 Vite，Vercel Functions 保护业务 API，Neon PostgreSQL 是任务数据的唯一持久事实来源。
 
 ## 当前开发状态
 
-当前分支已完成 Phase 0–4 的 MVP 功能与数据安全闭环：
+当前分支保留 Phase 0–4 的全部任务管理功能，并正在把持久化切换到 Phase 5 单用户云端架构：
 
 - Inbox、Today、Upcoming、Completed 四个基础视图。
 - 只输入标题即可快速创建任务。
 - Today 创建时自动设置当天计划日期。
-- IndexedDB 本地持久化，刷新后数据保留。
+- Neon 云端持久化，刷新、换浏览器或换设备后读取同一份数据。
 - 完成、短时撤销和从 Completed 恢复。
 - 编辑标题、备注、计划日期和截止日期，支持显式保存与取消。
 - 计划日期与截止日期独立，计划晚于截止时提供非阻断警告。
@@ -26,16 +26,16 @@
 - 设置页展示活动任务、已完成、项目、标签和软删除数据摘要。
 - 导出版本化 JSON 完整备份，包含软删除任务、项目、标签和设置。
 - 恢复前执行文件大小、schema、字段、ID 唯一性和跨实体引用校验，并展示摘要和二次确认。
-- 替换恢复在单一 IndexedDB 事务内完成；任一写入失败会整体回滚。
-- IndexedDB schema v3 迁移保留旧任务并增加设置与迁移元数据。
-- 首次在线加载后可离线打开应用、创建和编辑本地任务，并显示离线提示。
+- 替换恢复在单一 Neon 事务内完成；任一写入失败会整体回滚。
+- 旧 IndexedDB 只用于一次性迁移；迁移前确认，失败或成功都不自动删除旧数据。
+- 离线可打开应用壳，但业务修改不会写入本地或显示为已保存。
 - 详情打开自动聚焦、Esc 关闭后焦点归还，以及任务列表大数据渲染优化。
 - 响应式桌面/移动端布局和基础键盘快捷键。
 - PWA Manifest、Service Worker 更新提示和 Vercel SPA 回退配置。
 
 Phase 4 已完成 Chromium 生产 PWA 离线、360px 移动端、导出—恢复和基础无障碍验收。正式发布前仍建议在真实 Safari/Firefox 与个人手机上各抽测一次，并用真实长期数据观察性能。
 
-Phase 5A–5B 已完成可选云同步的基础设施与只读账号切片：设置页可登录/退出，服务端使用 Clerk 会话隔离 Neon 查询，并可读取云端摘要与首个增量页。登录不会自动上传本地任务，首次迁移、双向同步、冲突与删除安全仍属于 Phase 5C–5E；本地功能与 IndexedDB 数据路径保持不变。
+当前 Phase 5 已发布到 `https://personal-todo-mauve.vercel.app`，包含单用户访问密码、scrypt 哈希、HttpOnly 会话、数据库级登录限流、受保护的云端 CRUD、实体 revision 冲突保护、云端备份/事务恢复，以及旧 IndexedDB 的显式一次性迁移。Clerk 和旧的本地优先同步运行路径已移除。
 
 ## 本地运行
 
@@ -46,7 +46,7 @@ npm ci
 npm run dev
 ```
 
-打开终端显示的本地地址。默认进入 `/today`。
+打开终端显示的本地地址。纯 `vite` 开发服务器不承载 Vercel Functions，因此会安全显示“无法连接云端”；完整登录和数据流程需要配置服务端环境变量并通过 Vercel Functions 环境运行。
 
 ## 质量检查
 
@@ -66,14 +66,14 @@ npm run preview
 
 ## 数据与隐私
 
-- 账号登录是可选能力；未登录时全部 MVP 功能继续使用 IndexedDB。本阶段登录后只读取云端摘要，不代表已启用同步。
-- 在后续阶段由用户明确登录、确认首次上传前，不会把任务标题、备注或分类上传到云端。
-- 不同浏览器、设备和域名拥有相互独立的数据。
-- 清除浏览器站点数据会删除本地任务；可在设置页定期导出 JSON 完整备份。
+- 未建立有效密码会话时，业务 API 不返回任务数据。
+- 新建和修改的数据直接写入私人 Neon；浏览器只保留当前会话内存。
+- 旧 IndexedDB 数据只有在设置页展示摘要并由用户确认后才会迁移。
+- 清除浏览器站点数据不会删除 Neon 数据；仍建议定期导出 JSON 完整备份。
 
-## Phase 5A–5B 本地基础设施
+## Phase 5 单用户云端基础设施
 
-复制 `.env.example` 为不会提交的 `.env.local`，填入隔离的 Clerk 测试实例和 Neon 测试/Preview 分支变量。`DATABASE_ENVIRONMENT` 必须是 `development`、`test` 或 `preview`，数据库修改脚本才会运行。
+复制 `.env.example` 为不会提交的 `.env.local`，填入隔离的单用户访问配置和 Neon 测试/Preview 分支变量。`DATABASE_ENVIRONMENT` 必须是 `development`、`test` 或 `preview`，数据库修改脚本才会运行。
 
 ```bash
 npm run auth:check
@@ -83,7 +83,19 @@ npm run test:integration
 npm run functions:check
 ```
 
-Vercel Functions 提供 `GET /api/health`，以及受 Clerk 会话保护的 `GET /api/sync/state?protocolVersion=1` 和 `GET /api/sync/pull?protocolVersion=1`。`pull` 使用与服务端用户身份绑定的签名游标。首次上传、push、持续双向同步和冲突处理将在 Phase 5C～5E 按验收场景逐步实现。
+Vercel Functions 提供 `GET /api/health`、单用户密码会话 `/api/auth/session`，以及受 HttpOnly 会话保护的 `/api/data/*`。Neon 是任务、项目、标签和设置的唯一持久事实来源；IndexedDB 只用于把旧版本数据显式迁移到空云端。
+
+### 单用户云端模式配置
+
+先在本机生成一次访问密码、scrypt 哈希和会话密钥：
+
+```bash
+npm run auth:generate
+```
+
+把输出的 `ACCESS_PASSWORD` 保存到密码管理器，不要配置到 Vercel。只把 `SINGLE_USER_PASSWORD_HASH`、`SINGLE_USER_SESSION_SECRET` 和 `SINGLE_USER_ID=single-user` 配置为服务端环境变量，并为各环境配置精确的 `APP_ORIGINS`。Development、Preview、Production 必须使用彼此独立的密码哈希、会话密钥和 Neon 数据库。
+
+部署前先在对应隔离数据库执行 migration；`0002_single_user_cloud_mode.sql` 增加数据库级登录限流表。不要提交 `.env.local`，也不要把上述服务端变量加上 `VITE_` 前缀。
 
 ## Git 与部署
 

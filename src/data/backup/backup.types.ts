@@ -1,7 +1,7 @@
-import type { Project } from '../../domain/project/project.types'
-import type { AppSettings } from '../../domain/settings/settings.types'
-import type { Tag } from '../../domain/tag/tag.types'
-import type { Task, UTCDateTime } from '../../domain/task/task.types'
+import type { Project } from '../../domain/project/project.types.js'
+import type { AppSettings } from '../../domain/settings/settings.types.js'
+import type { Tag } from '../../domain/tag/tag.types.js'
+import type { Task, UTCDateTime } from '../../domain/task/task.types.js'
 
 export const BACKUP_SCHEMA_VERSION = 1 as const
 export const APP_VERSION = '0.1.0'

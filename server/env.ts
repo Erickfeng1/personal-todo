@@ -18,8 +18,9 @@ const migrationEnvSchema = z.object({
 })
 
 const authEnvSchema = z.object({
-  CLERK_SECRET_KEY: z.string().min(1),
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  SINGLE_USER_PASSWORD_HASH: z.string().startsWith('scrypt$'),
+  SINGLE_USER_SESSION_SECRET: z.string().min(32),
+  SINGLE_USER_ID: z.string().trim().min(1).default('single-user'),
   APP_ORIGINS: z.string().optional(),
   VERCEL_URL: z.string().optional(),
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional()

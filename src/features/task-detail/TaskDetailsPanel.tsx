@@ -340,7 +340,7 @@ export function TaskDetailsPanel({
 
         <div className={`save-status save-${saveState}`} role="status">
           {saveState === 'saving' ? '正在保存…' : null}
-          {saveState === 'saved' ? '已保存在本设备' : null}
+          {saveState === 'saved' ? '已保存到云端' : null}
           {saveState === 'error' ? '保存失败，草稿仍保留' : null}
           {saveState === 'idle' && isDirty ? '有尚未保存的修改' : null}
           {saveState === 'idle' && !isDirty ? '没有待保存的修改' : null}
@@ -372,7 +372,7 @@ export function TaskDetailsPanel({
         </div>
         <div>
           <dt>数据位置</dt>
-          <dd>此浏览器 IndexedDB</dd>
+          <dd>Neon 云数据库</dd>
         </div>
       </dl>
       <button

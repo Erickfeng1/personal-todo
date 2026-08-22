@@ -1,18 +1,20 @@
-import { db } from '../data/db'
-import { DexieTaskRepository } from '../data/repositories/dexie-task.repository'
 import { TaskService } from '../domain/task/task.service'
-import { DexieProjectRepository } from '../data/repositories/dexie-project.repository'
-import { DexieTagRepository } from '../data/repositories/dexie-tag.repository'
 import { ProjectService } from '../domain/project/project.service'
 import { TagService } from '../domain/tag/tag.service'
-import { DexieSettingsRepository } from '../data/repositories/dexie-settings.repository'
 import { SettingsService } from '../domain/settings/settings.service'
-import { BackupService } from '../data/backup/backup.service'
+import { cloudStore } from '../cloud/cloud-store'
+import {
+  CloudProjectRepository,
+  CloudSettingsRepository,
+  CloudTagRepository,
+  CloudTaskRepository
+} from '../cloud/cloud-repositories'
+import { CloudBackupService } from '../cloud/cloud-backup.service'
 
-export const taskRepository = new DexieTaskRepository(db)
-export const projectRepository = new DexieProjectRepository(db)
-export const tagRepository = new DexieTagRepository(db)
-export const settingsRepository = new DexieSettingsRepository(db)
+export const taskRepository = new CloudTaskRepository(cloudStore)
+export const projectRepository = new CloudProjectRepository(cloudStore)
+export const tagRepository = new CloudTagRepository(cloudStore)
+export const settingsRepository = new CloudSettingsRepository(cloudStore)
 export const taskService = new TaskService({
   repository: taskRepository,
   projectRepository,
@@ -25,7 +27,4 @@ export const tagService = new TagService({ repository: tagRepository })
 export const settingsService = new SettingsService({
   repository: settingsRepository
 })
-export const backupService = new BackupService({
-  database: db,
-  settingsService
-})
+export const backupService = new CloudBackupService(cloudStore)

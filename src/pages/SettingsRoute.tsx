@@ -8,7 +8,7 @@ const SettingsPage = lazy(() =>
 
 export function SettingsRoute() {
   return (
-    <Suspense fallback={<div className="route-loading">正在读取本地设置…</div>}>
+    <Suspense fallback={<div className="route-loading">正在读取云端设置…</div>}>
       <SettingsPage />
     </Suspense>
   )

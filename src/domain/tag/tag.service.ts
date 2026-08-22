@@ -47,6 +47,7 @@ export class TagService {
     try {
       return await this.repository.deleteAndDetach(id)
     } catch (cause) {
+      if (cause instanceof AppError) throw cause
       throw new AppError(
         'STORAGE_WRITE_FAILED',
         '标签未能删除，任务没有被修改，请重试',
@@ -79,6 +80,7 @@ export class TagService {
     try {
       await this.repository.save(tag)
     } catch (cause) {
+      if (cause instanceof AppError) throw cause
       throw new AppError('STORAGE_WRITE_FAILED', '标签未能保存，请重试', {
         cause
       })

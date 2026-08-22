@@ -8,8 +8,8 @@ import {
 } from './env'
 
 const requiredAuth = {
-  CLERK_SECRET_KEY: 'secret',
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'publishable'
+  SINGLE_USER_PASSWORD_HASH: 'scrypt$salt$hash',
+  SINGLE_USER_SESSION_SECRET: 'a-secret-that-is-at-least-32-characters'
 }
 
 describe('server environment', () => {

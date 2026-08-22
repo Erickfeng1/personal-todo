@@ -1,28 +1,28 @@
 import { z } from 'zod'
-import { isLocalDate, type LocalDate } from '../../domain/date/local-date'
-import { AppError } from '../../domain/shared/app-error'
-import type { Project } from '../../domain/project/project.types'
+import { isLocalDate, type LocalDate } from '../../domain/date/local-date.js'
+import { AppError } from '../../domain/shared/app-error.js'
+import type { Project } from '../../domain/project/project.types.js'
 import {
   isThemePreference,
   isWeekStartsOn
-} from '../../domain/settings/settings.rules'
+} from '../../domain/settings/settings.rules.js'
 import type {
   AppSettings,
   ThemePreference,
   WeekStartsOn
-} from '../../domain/settings/settings.types'
-import type { Tag } from '../../domain/tag/tag.types'
-import type { Task } from '../../domain/task/task.types'
-import { BACKUP_SCHEMA_VERSION, type BackupEnvelopeV1 } from './backup.types'
+} from '../../domain/settings/settings.types.js'
+import type { Tag } from '../../domain/tag/tag.types.js'
+import type { Task } from '../../domain/task/task.types.js'
+import { BACKUP_SCHEMA_VERSION, type BackupEnvelopeV1 } from './backup.types.js'
 
-const idSchema = z.string().trim().min(1).max(200)
+const idSchema = z.uuid()
 const utcDateSchema = z.string().datetime({ offset: true })
 const nullableUtcDateSchema = utcDateSchema.nullable()
 const localDateSchema = z.custom<LocalDate>(
   (value) => typeof value === 'string' && isLocalDate(value)
 )
 
-const taskSchema: z.ZodType<Task> = z
+export const taskSchema: z.ZodType<Task> = z
   .object({
     id: idSchema,
     title: z.string().trim().min(1).max(200),
@@ -59,7 +59,7 @@ const taskSchema: z.ZodType<Task> = z
     }
   })
 
-const projectSchema: z.ZodType<Project> = z
+export const projectSchema: z.ZodType<Project> = z
   .object({
     id: idSchema,
     name: z.string().trim().min(1).max(50),
@@ -71,7 +71,7 @@ const projectSchema: z.ZodType<Project> = z
   })
   .strict()
 
-const tagSchema: z.ZodType<Tag> = z
+export const tagSchema: z.ZodType<Tag> = z
   .object({
     id: idSchema,
     name: z.string().trim().min(1).max(50),
@@ -81,7 +81,7 @@ const tagSchema: z.ZodType<Tag> = z
   })
   .strict()
 
-const settingsSchema: z.ZodType<AppSettings> = z
+export const settingsSchema: z.ZodType<AppSettings> = z
   .object({
     id: z.literal('singleton'),
     theme: z.custom<ThemePreference>(isThemePreference),

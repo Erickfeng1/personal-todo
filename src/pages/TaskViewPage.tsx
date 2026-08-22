@@ -280,7 +280,7 @@ export function TaskViewPage({
         ) : null}
 
         {tasks === undefined ? (
-          <div className="loading-list" aria-label="正在读取本地任务">
+          <div className="loading-list" aria-label="正在读取云端任务">
             <span />
             <span />
             <span />

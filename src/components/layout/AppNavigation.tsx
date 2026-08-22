@@ -54,8 +54,8 @@ export function AppNavigation() {
       <div className="local-first-note">
         <span className="local-dot" aria-hidden="true" />
         <div>
-          <strong>{isSignedIn ? '同步尚未启用' : '仅保存在此设备'}</strong>
-          <span>{isSignedIn ? '已登录 · 本地优先' : '本地模式'}</span>
+          <strong>{isSignedIn ? '云端已连接' : '云端已锁定'}</strong>
+          <span>{isSignedIn ? 'Neon 唯一存储' : '需要访问密码'}</span>
         </div>
       </div>
     </aside>

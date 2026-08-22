@@ -2,10 +2,19 @@
 
 > 文档状态：MVP 基线 + Phase 5 已批准范围
 > 本地业务 Schema 版本：1（Phase 5 实现时递增）
-> 存储目标：浏览器 IndexedDB 为本地数据源；Phase 5 增加托管 PostgreSQL
+> 存储目标：Neon PostgreSQL 是业务数据唯一事实来源；IndexedDB 仅作为旧数据迁移输入
 > 原则：领域模型不依赖具体 UI；日期语义明确；所有引用可校验
 
 ## 1. 建模原则
+
+当前持久化原则（D-020）：
+
+- `Task`、`Project`、`Tag`、`AppSettings` 只由服务端 API 持久化到 Neon。
+- 客户端可以维护当前会话内存快照，但不得把它作为持久业务数据源。
+- 每个云端实体具有服务端 `revision`；该字段是存储信封元数据，不进入领域对象 payload。
+- 所有行使用固定服务端 owner `single-user`，客户端不得提交或选择 owner。
+- 第 8、16、18、19 节中的 IndexedDB 日常写入/outbox/同步规则是历史设计，由 D-020 取代；仅第 20 节的一次性迁移读取仍适用。
+- `single_user_login_attempts` 只保存由会话密钥 HMAC 后的请求来源指纹、失败次数、窗口起点和锁定到期时间；不保存访问密码或原始 IP，并用于 15 分钟窗口内的服务端限流。
 
 1. 一项任务只存一份，页面视图由查询得到。
 2. “计划日期”与“截止日期”是不同业务概念。
@@ -197,7 +206,7 @@ interface DatabaseMeta {
 }
 ```
 
-## 8. IndexedDB 表与索引
+## 8. IndexedDB 表与索引（历史数据与一次性迁移）
 
 建议使用 Dexie 管理 IndexedDB。
 
@@ -417,7 +426,11 @@ personal-todo-backup-YYYY-MM-DD-HHmm.json
 - Phase 5 云同步使用独立同步元数据、版本检查和删除墓碑；不能直接把当前 Dexie 表暴露给云端，详见第 15～20 节。
 - 子任务需决定是独立 Task 还是 ChecklistItem。MVP 暂不预留含糊字段。
 
-## 15. Phase 5 建模边界
+## 15. Phase 5 建模边界（当前云端权威模式）
+
+当前模式不再维护本地/云端双副本。云表沿用 `cloud_tasks`、`cloud_projects`、`cloud_tags`、`cloud_settings`，固定 `user_id = 'single-user'`；`payload` 继续使用本文件定义的领域对象，`revision` 由服务端单调递增。`sync_deleted_at`、`sync_changes`、`processed_mutations` 和本地同步元数据仅为历史兼容结构，不参与新客户端运行路径。
+
+JSON 替换恢复与旧 IndexedDB 首次迁移都必须在一个服务端事务中完成：先完整校验，再替换固定 owner 的四类业务数据；失败时回滚全部写入。
 
 Phase 5 不修改第 3～6 节的领域实体语义，也不把 `userId`、网络错误或队列状态塞进 `Task`、`Project`、`Tag`。同步信息属于持久化适配层，原因是：
 
@@ -428,7 +441,7 @@ Phase 5 不修改第 3～6 节的领域实体语义，也不把 `userId`、网�
 
 云端表使用与本地相同的客户端生成 UUID。`plannedDate`、`deadline` 仍按 `YYYY-MM-DD` 保存；事件时间仍使用 UTC。
 
-## 16. 本地同步元数据
+## 16. 本地同步元数据（历史，D-020 已取代）
 
 Phase 5 增加以下 IndexedDB 适配层表；具体 Dexie schema 版本由实现提交确定并配套迁移测试。
 
@@ -557,7 +570,7 @@ sync_bootstraps
 - 服务端校验 Task 的项目/标签引用属于同一用户；不得只验证 ID 存在。
 - Task 的普通“删除”仍映射为业务 payload 中的 `Task.deletedAt`；服务端可同时保留最后快照和同步墓碑，客户端恢复时仍能还原该任务。Tag 等真正移除本地实体的操作使用仅表示实体消失的同步墓碑，并在同一事务中清理引用。
 
-## 18. 同步写入规则
+## 18. 同步写入规则（历史，D-020 已取代）
 
 一次本地修改：
 
@@ -572,7 +585,7 @@ sync_bootstraps
 
 同一实体的多次未发送本地修改可以在客户端压缩，但必须保持最终操作、首次 `baseRevision` 和删除语义正确；实现前需用单元测试证明压缩规则。
 
-## 19. 增量拉取与删除墓碑
+## 19. 增量拉取与删除墓碑（历史，D-020 已取代）
 
 - 客户端以 `SyncCursor.cursor` 拉取该用户在游标之后的有序变更。
 - 服务端返回变更快照或墓碑，以及只有服务端能够签发/解释的下一游标。
@@ -581,7 +594,7 @@ sync_bootstraps
 - 存在本地待提交修改且服务端 revision 前进时，进入冲突，不自动覆盖。
 - 墓碑使离线旧设备能够得知删除。Task 墓碑在保留期内携带最后一个受验证快照，以支持现有软删除/撤销语义；Tag 墓碑可不携带 payload。墓碑保留策略在上线前按最长支持离线周期确定；没有完成全量重建机制前不得硬删除墓碑。
 
-## 20. 首次迁移与 JSON 恢复
+## 20. 首次迁移与 JSON 恢复（当前）
 
 首次迁移：
 

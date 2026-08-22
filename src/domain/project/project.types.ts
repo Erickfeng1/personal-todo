@@ -1,4 +1,4 @@
-import type { UTCDateTime, UUID } from '../task/task.types'
+import type { UTCDateTime, UUID } from '../task/task.types.js'
 
 export interface Project {
   id: UUID

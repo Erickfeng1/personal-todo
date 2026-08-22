@@ -34,17 +34,28 @@ describe('backup service', () => {
   async function seedData() {
     const project = createProject(
       { name: '工作' },
-      { id: 'project-1', now: '2026-08-11T08:00:00.000Z', sortOrder: 1 }
+      {
+        id: '15b90359-e944-4f76-aee0-d86d8fb79e91',
+        now: '2026-08-11T08:00:00.000Z',
+        sortOrder: 1
+      }
     )
     const tag = createTag(
       { name: '等待回复' },
-      { id: 'tag-1', now: '2026-08-11T08:00:00.000Z' }
+      {
+        id: 'c029990e-5f63-4a5c-a21a-d0c90d43f026',
+        now: '2026-08-11T08:00:00.000Z'
+      }
     )
     const task = {
       ...createTask(
         { title: '跟进合同' },
         { source: 'project', projectId: project.id },
-        { id: 'task-1', now: '2026-08-11T08:00:00.000Z', sortOrder: 1 }
+        {
+          id: '58405c9a-48e8-40a8-a684-d37a6d748c0f',
+          now: '2026-08-11T08:00:00.000Z',
+          sortOrder: 1
+        }
       ),
       tagIds: [tag.id],
       importance: 'important' as const,
@@ -98,7 +109,7 @@ describe('backup service', () => {
     const invalid = structuredClone(backup)
     invalid.data.tasks[0] = {
       ...invalid.data.tasks[0]!,
-      projectId: 'missing-project'
+      projectId: 'aaa2f4e8-96f9-4d95-8641-33708b02004d'
     }
     expect(() => validateBackup(invalid)).toThrow('不存在的项目')
     await expect(database.tasks.get(task.id)).resolves.toEqual(task)

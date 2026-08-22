@@ -59,7 +59,7 @@ export function SettingsPage() {
     setError(null)
     try {
       await settingsService.update({ theme })
-      setMessage('主题设置已保存在此设备')
+      setMessage('主题设置已保存到云端')
     } catch {
       setError('主题保存失败，请重试。')
     }
@@ -142,7 +142,7 @@ export function SettingsPage() {
         <div>
           <span className="eyebrow">PREFERENCES</span>
           <h1>设置</h1>
-          <p>管理显示偏好，并把本地数据掌握在自己手中。</p>
+          <p>管理显示偏好，并随时导出你的云端数据副本。</p>
         </div>
       </header>
 
@@ -165,7 +165,7 @@ export function SettingsPage() {
             <span>APPEARANCE</span>
             <h2 id="appearance-title">显示与日期</h2>
           </div>
-          <p>偏好仅保存在当前浏览器。</p>
+          <p>偏好保存到云端，并在设备之间保持一致。</p>
         </div>
 
         <fieldset className="settings-choice">
@@ -219,10 +219,10 @@ export function SettingsPage() {
       <section className="settings-section" aria-labelledby="data-title">
         <div className="settings-section-header">
           <div>
-            <span>LOCAL DATA</span>
+            <span>CLOUD DATA</span>
             <h2 id="data-title">数据与备份</h2>
           </div>
-          <p>备份文件只在浏览器与设备之间流转，不会上传。</p>
+          <p>导出读取当前云端快照；恢复会事务性替换 Neon 数据。</p>
         </div>
 
         <div className="statistics-grid" aria-label="数据统计">
@@ -322,10 +322,12 @@ export function SettingsPage() {
       >
         <div>
           <span>ABOUT</span>
-          <h2 id="about-title">本地优先说明</h2>
+          <h2 id="about-title">云端存储说明</h2>
         </div>
         <p>
-          清除浏览器站点数据会删除本地任务，请定期导出备份。登录本身不会上传任务；只有在后续明确启用同步后，任务数据才会写入云端。
+          Neon
+          是唯一业务数据源；清除浏览器站点数据不会删除云端任务。仍建议定期导出
+          JSON 作为独立备份。
         </p>
         <dl>
           <div>

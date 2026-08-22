@@ -71,6 +71,7 @@ export class ProjectService {
     try {
       await this.repository.save(project)
     } catch (cause) {
+      if (cause instanceof AppError) throw cause
       throw new AppError('STORAGE_WRITE_FAILED', '项目未能保存，请重试', {
         cause
       })

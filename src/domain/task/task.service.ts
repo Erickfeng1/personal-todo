@@ -156,6 +156,7 @@ export class TaskService {
     try {
       await this.repository.save(task)
     } catch (error) {
+      if (error instanceof AppError) throw error
       throw new AppError('STORAGE_WRITE_FAILED', '任务未能保存，请重试', {
         cause: error
       })

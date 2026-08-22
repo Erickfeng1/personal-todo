@@ -3,7 +3,7 @@ import type {
   ThemePreference,
   UpdateSettingsInput,
   WeekStartsOn
-} from './settings.types'
+} from './settings.types.js'
 
 export const DEFAULT_LOCALE = 'zh-CN'
 

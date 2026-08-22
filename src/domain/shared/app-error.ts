@@ -7,6 +7,8 @@ export type AppErrorCode =
   | 'BACKUP_INVALID'
   | 'BACKUP_UNSUPPORTED_VERSION'
   | 'BACKUP_RESTORE_FAILED'
+  | 'UNAUTHORIZED'
+  | 'CONFLICT'
 
 export class AppError extends Error {
   readonly code: AppErrorCode

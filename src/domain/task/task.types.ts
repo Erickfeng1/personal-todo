@@ -1,4 +1,4 @@
-import type { LocalDate } from '../date/local-date'
+import type { LocalDate } from '../date/local-date.js'
 
 export type UUID = string
 export type UTCDateTime = string
